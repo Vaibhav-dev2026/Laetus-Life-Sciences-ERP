@@ -29,10 +29,8 @@ async function launchBrowser() {
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
   };
 
-  // Highest priority: an explicit PUPPETEER_EXECUTABLE_PATH env var (e.g. set
-  // on Render after `apt-get install chromium` in the build command). This
-  // was previously never read anywhere, so setting it had zero effect.
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+  // Optional priority: an explicit PUPPETEER_EXECUTABLE_PATH env var if file exists on disk
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
     return await puppeteer.launch({ ...launchArgs, executablePath: process.env.PUPPETEER_EXECUTABLE_PATH });
   }
 

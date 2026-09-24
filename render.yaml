@@ -1,23 +1,18 @@
 # Render Blueprint for the Laetus ERP backend.
 # Deploy: Render dashboard -> New -> Blueprint -> point at this repo.
-# This installs Chromium during the build so Puppeteer-based PDF generation
-# (invoices, GST reports, ledgers) works on Render's free tier instead of
-# silently falling back to an HTML file (see backend/src/services/pdf.service.js).
+# Uses standard npm ci to install Puppeteer and its bundled Chrome binary for PDF generation
+# (invoices, GST reports, ledgers) on Render's free tier.
 services:
   - type: web
     name: laetus-erp-backend
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: "apt-get update && apt-get install -y chromium && npm install"
+    buildCommand: "npm ci"
     startCommand: "npm start"
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: "true"
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: /usr/bin/chromium
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET
