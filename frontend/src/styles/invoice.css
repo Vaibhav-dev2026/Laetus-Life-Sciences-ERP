@@ -1,0 +1,129 @@
+@import "./variables.css";
+
+/* ══════════════════════════════════════════
+   INVOICE — Screen + Print
+   Invoice must remain readable on white paper.
+   Brand color used in header ONLY on screen.
+   All print styles are forced to B&W.
+   ══════════════════════════════════════════ */
+
+.invoice-page {
+  background: #fff;
+  color: #111;
+  max-width: 900px;
+  margin: 0 auto;
+  border: 1px solid #ddd;
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  font-size: 12.5px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-5);
+  border-bottom: 2px solid #111;
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+/* Brand accent on screen */
+@media screen {
+  .invoice-header {
+    border-bottom-color: #8a6220;
+  }
+  .invoice-header .invoice-title h1 {
+    background: linear-gradient(135deg, #D4A84F 0%, #E9D39A 50%, #9C7430 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+.invoice-header .company-block { display: flex; gap: var(--space-3); align-items: center; }
+.invoice-header .company-logo { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; }
+.invoice-header .company-name { font-size: 19px; font-weight: 700; letter-spacing: 0.02em; color: #111; }
+.invoice-header .company-meta { font-size: 11px; color: #444; line-height: 1.5; }
+.invoice-header .invoice-title { text-align: right; }
+.invoice-header .invoice-title h1 { font-size: 20px; letter-spacing: 0.08em; color: #8a6220; font-weight: 700; }
+.invoice-header .invoice-title .invoice-no { font-size: 12px; color: #333; margin-top: 4px; }
+
+.invoice-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  margin-bottom: var(--space-4);
+}
+.invoice-parties .party-box {
+  border: 1px solid #ccc;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+.invoice-parties h5 { font-size: 10.5px; text-transform: uppercase; color: #777; margin-bottom: 4px; letter-spacing: 0.05em; }
+.invoice-parties .party-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; color: #111; }
+.invoice-meta-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 2px 0; color: #333; }
+
+table.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-4);
+  font-size: 10.5px;
+}
+.invoice-table th, .invoice-table td {
+  border: 1px solid #bbb;
+  padding: 5px 7px;
+  text-align: right;
+  color: #111;
+}
+.invoice-table th { background: #f5f0e8; color: #5a3e0a; text-align: center; font-weight: 700; letter-spacing: 0.04em; }
+.invoice-table td:nth-child(2), .invoice-table th:nth-child(2) { text-align: left; }
+
+.invoice-totals {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
+.invoice-totals table { border-collapse: collapse; min-width: 260px; font-size: 11.5px; }
+.invoice-totals td { padding: 3px 8px; color: #222; }
+.invoice-totals .grand-total td { font-weight: 700; font-size: 13px; border-top: 2px solid #111; padding-top: 6px; }
+
+.invoice-footer {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: var(--space-5);
+  border-top: 1px solid #ccc;
+  padding-top: var(--space-4);
+}
+.invoice-footer .amount-words { font-size: 11px; margin-bottom: var(--space-3); color: #333; }
+.invoice-footer .bank-details, .invoice-footer .terms { font-size: 10.5px; color: #444; margin-bottom: var(--space-3); }
+.invoice-footer .signatory-block { text-align: right; }
+.invoice-footer .signatory-line { margin-top: 44px; border-top: 1px solid #555; padding-top: 4px; font-size: 11px; }
+
+/* ══════════════════════════════════════════
+   PRINT OVERRIDES — Force B&W, hide UI chrome
+   ══════════════════════════════════════════ */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .invoice-page {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    font-size: 11.5px !important;
+  }
+  .invoice-header { border-bottom-color: #000 !important; }
+  .invoice-header .invoice-title h1 {
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #000 !important;
+    background-clip: unset !important;
+    color: #000 !important;
+  }
+  .invoice-table th { background: #eee !important; color: #000 !important; }
+  .no-print, .topbar, .sidebar, .page-header-actions, .btn { display: none !important; }
+}
+
+

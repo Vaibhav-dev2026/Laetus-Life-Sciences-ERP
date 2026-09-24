@@ -1,0 +1,43 @@
+# Root-level gitignore — covers the monorepo
+# Subfolder .gitignore files add folder-specific rules
+
+# Credentials / secrets — NEVER commit real values
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Test artifacts
+coverage/
+*.log
+
+# Backend runtime data — local disk only, ephemeral on cloud
+backend/backups/*
+!backend/backups/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/test_output.pdf
+backend/test_*.js
+backend/check_db.js

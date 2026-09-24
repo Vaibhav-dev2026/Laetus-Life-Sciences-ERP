@@ -1,0 +1,54 @@
+.billing-grid { display: grid; grid-template-columns: 1fr 320px; gap: var(--space-5); align-items: start; }
+
+/* Customer autocomplete dropdown */
+.customer-search-result {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-lg);
+  position: absolute;
+  z-index: 15;
+  width: 100%;
+}
+.customer-search-result button {
+  display: block; width: 100%; text-align: left;
+  padding: 9px 12px; background: none; border: none; cursor: pointer;
+  font-size: var(--font-size-sm); border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.customer-search-result button:hover {
+  background: rgba(212, 168, 79, 0.10);
+  color: var(--brand-gold-light);
+}
+
+/* Selected customer info card */
+.customer-picked-card {
+  background: var(--color-surface-alt);
+  border: 1px solid rgba(212, 168, 79, 0.2);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+/* Batch picker */
+.batch-picker-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); margin-top: 6px; }
+.batch-picker-table th, .batch-picker-table td { padding: 6px 8px; border-bottom: 1px solid var(--color-border); text-align: left; }
+.batch-picker-table th { color: var(--brand-gold); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.05em; }
+.batch-picker-table tr.disabled { opacity: 0.45; }
+.batch-picker-table tr:hover:not(.disabled) { background: rgba(212, 168, 79, 0.07); cursor: pointer; }
+
+.product-search-wrap { position: relative; }
+.sticky-summary { position: sticky; top: calc(var(--topbar-height) + 12px); }
+
+/* Invoice line items table in billing form */
+.line-items-table th { color: var(--brand-gold); }
+.line-items-total { font-weight: var(--font-weight-bold); color: var(--brand-gold-light); }
+
+@media (max-width: 900px) {
+  .billing-grid { grid-template-columns: 1fr; }
+  .sticky-summary { position: static; }
+}
+

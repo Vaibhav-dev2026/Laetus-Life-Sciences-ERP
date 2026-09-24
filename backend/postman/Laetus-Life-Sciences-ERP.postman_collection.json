@@ -1,0 +1,38 @@
+{
+  "info": { "name": "Laetus Life Sciences ERP", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    { "name": "Health", "request": { "method": "GET", "url": "{{baseUrl}}/health" } },
+    { "name": "Auth - Login", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}],
+      "body": { "mode": "raw", "raw": "{\n  \"email\": \"your-admin-email@example.com\",\n  \"password\": \"your-password\"\n}" },
+      "url": "{{baseUrl}}/auth/login" } },
+    { "name": "Auth - Me", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/auth/me" } },
+    { "name": "Customers - List", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/customers" } },
+    { "name": "Customers - Create", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}],
+      "body": { "mode": "raw", "raw": "{\n  \"partyName\": \"Test Medical Store\",\n  \"type\": \"Medical Store\",\n  \"mobile\": \"9876543210\"\n}" },
+      "url": "{{baseUrl}}/customers" } },
+    { "name": "Suppliers - List", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/suppliers" } },
+    { "name": "Products - List", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/products" } },
+    { "name": "Batches - List", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/batches" } },
+    { "name": "Purchases - Create", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}],
+      "body": { "mode": "raw", "raw": "{\n  \"purchaseInvoiceNo\": \"PI-1001\",\n  \"purchaseDate\": \"2026-08-01\",\n  \"supplierId\": \"SUPP-000001\",\n  \"lines\": [ { \"productId\": \"PRD-000001\", \"batchNo\": \"NEWBATCH-01\", \"expDate\": \"2028-01-01\", \"qty\": 100, \"rate\": 45, \"gstRate\": 12 } ]\n}" },
+      "url": "{{baseUrl}}/purchases" } },
+    { "name": "Sales - Create", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}],
+      "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"CUST-000001\",\n  \"date\": \"2026-08-22\",\n  \"lines\": [ { \"productId\": \"PRD-000001\", \"batchId\": \"BAT-000001\", \"qty\": 2, \"rate\": 55, \"gstRate\": 12, \"hsn\": \"30049099\" } ],\n  \"amountReceived\": 50\n}" },
+      "url": "{{baseUrl}}/sales" } },
+    { "name": "Payments - Create", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}],
+      "body": { "mode": "raw", "raw": "{\n  \"partyId\": \"CUST-000001\",\n  \"partyType\": \"Customer\",\n  \"amount\": 500,\n  \"mode\": \"UPI\",\n  \"date\": \"2026-08-22\"\n}" },
+      "url": "{{baseUrl}}/payments" } },
+    { "name": "Returns - Sales Return", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}],
+      "body": { "mode": "raw", "raw": "{\n  \"saleId\": \"INV-000001\",\n  \"lineIndex\": 0,\n  \"qty\": 1,\n  \"reason\": \"Customer request\"\n}" },
+      "url": "{{baseUrl}}/returns/sales" } },
+    { "name": "Reports - Sales", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/reports/sales" } },
+    { "name": "GST - GSTR1", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/gst/gstr1" } },
+    { "name": "Dashboard - Summary", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/dashboard/summary" } },
+    { "name": "Notifications - List", "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/notifications" } },
+    { "name": "Backup - Create", "request": { "method": "POST", "header": [{"key":"Authorization","value":"Bearer {{token}}"}], "url": "{{baseUrl}}/backup/create" } }
+  ]
+}

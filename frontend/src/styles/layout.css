@@ -1,0 +1,26 @@
+@import "./variables.css";
+/* Layout styles are in components/layout/layout.css */
+/* This file handles any additional page-level layout utilities */
+
+.app-bg {
+  background:
+    radial-gradient(circle at top right, rgba(212, 168, 79, 0.06) 0%, transparent 35%),
+    var(--color-bg);
+  min-height: 100vh;
+}
+
+/* Stat grid (for reports, outstanding, inventory) */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-4); }
+
+/* Print-safe: no layout chrome in print mode */
+@media print {
+  .sidebar, .topbar, .sidebar-mobile-backdrop, .no-print { display: none !important; }
+  .content-area { display: block; }
+  .page-body { padding: 0; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+

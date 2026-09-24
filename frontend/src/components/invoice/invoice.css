@@ -1,0 +1,279 @@
+.line-editor-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); min-width: 900px; }
+.line-editor-table th { text-align: left; font-size: var(--font-size-xs); text-transform: uppercase; color: var(--color-text-muted); padding: 8px 8px; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+.line-editor-table td { padding: 6px 8px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.line-editor-table input, .line-editor-table select { padding: 6px 8px; font-size: var(--font-size-sm); }
+.line-editor-table .num-input { width: 74px; text-align: right; }
+.line-editor-table .amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.batch-flag { font-size: 10px; padding: 1px 6px; border-radius: var(--radius-pill); margin-left: 4px; }
+.invoice-totals { margin-left: auto; width: 320px; }
+.invoice-totals .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: var(--font-size-sm); }
+.invoice-totals .row.grand { border-top: 2px solid var(--color-border-strong); margin-top: 6px; padding-top: 10px; font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); }
+.invoice-actions-bar { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
+
+/* Pharma A4 GST Invoice Document */
+.invoice-preview-doc {
+  background: #ffffff;
+  padding: 16px;
+  font-size: 11px;
+  color: #111111;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  border: 1px solid #333333;
+  margin: 0 auto;
+}
+
+.inv-header-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #222222;
+  border-bottom: 2px solid #222222;
+}
+
+.inv-header-box {
+  padding: 8px 10px;
+}
+
+.inv-header-box.company-side {
+  border-right: 1px solid #222222;
+}
+
+.company-branding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.company-logo-badge {
+  width: 28px;
+  height: 28px;
+  background: #0284c7;
+  color: #ffffff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.company-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #000000;
+}
+
+
+.customer-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color: #000000;
+}
+
+.company-info, .customer-info {
+  font-size: 10px;
+  line-height: 1.4;
+  color: #222222;
+}
+
+.inv-title-bar {
+  border-left: 1px solid #222222;
+  border-right: 1px solid #222222;
+  border-bottom: 1px solid #222222;
+  background: #fdfdfd;
+}
+
+.inv-title-text {
+  text-align: center;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  padding: 4px 0 2px;
+  border-bottom: 1px solid #333333;
+}
+
+.inv-meta-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1fr 1fr;
+  padding: 4px 8px;
+  font-size: 10.5px;
+  background: #fafafa;
+}
+
+table.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-left: 1px solid #222222;
+  border-right: 1px solid #222222;
+  border-bottom: 1px solid #222222;
+  font-size: 10px;
+}
+
+table.invoice-table th, table.invoice-table td {
+  border: 1px solid #222222;
+  padding: 4px 4px;
+  color: #111111;
+}
+
+table.invoice-table th {
+  background: #f2f2f2;
+  font-weight: 700;
+  text-align: center;
+  font-size: 10px;
+}
+
+.empty-row td {
+  height: 16px;
+}
+
+.inv-bottom-section {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1.1fr;
+  border-left: 1px solid #222222;
+  border-right: 1px solid #222222;
+  border-bottom: 1px solid #222222;
+}
+
+.inv-bottom-col {
+  padding: 6px 8px;
+}
+
+.inv-bottom-col.left-col {
+  border-right: 1px solid #222222;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.inv-bottom-col.mid-col {
+  border-right: 1px solid #222222;
+}
+
+.box-heading {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  border-bottom: 1px solid #444444;
+  padding-bottom: 2px;
+}
+
+.bank-details-content {
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.ledger-balance-row {
+  margin-top: 4px;
+  font-size: 10px;
+  border-top: 1px dashed #666;
+  padding-top: 2px;
+}
+
+.terms-box {
+  margin-top: 6px;
+}
+
+.terms-list {
+  font-size: 8.5px;
+  line-height: 1.35;
+  color: #333333;
+  padding-left: 14px;
+  margin: 2px 0 0 0;
+}
+
+.scan-pay-strip {
+  margin-top: 6px;
+  font-size: 9px;
+  background: #f4f4f4;
+  padding: 2px 4px;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+
+.gst-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5px;
+  margin-top: 4px;
+}
+
+.gst-summary-table th, .gst-summary-table td {
+  border: 1px solid #444444;
+  padding: 2px 4px;
+  text-align: right;
+}
+
+.gst-summary-table th {
+  background: #eaeaea;
+  text-align: center;
+  font-size: 9px;
+}
+
+.totals-table {
+  font-size: 10.5px;
+}
+
+.total-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px dotted #ccc;
+}
+
+.total-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.grand-total-line {
+  font-weight: 800;
+  font-size: 12px;
+  border-top: 1.5px solid #222222;
+  border-bottom: none;
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.total-val-grand {
+  font-weight: 800;
+  color: #000000;
+}
+
+.amount-words-strip {
+  margin-top: 8px;
+  font-size: 9.5px;
+  border-top: 1px solid #444;
+  padding-top: 4px;
+  line-height: 1.3;
+}
+
+.inv-signature-strip {
+  display: flex;
+  justify-content: space-between;
+  border-left: 1px solid #222222;
+  border-right: 1px solid #222222;
+  border-bottom: 1px solid #222222;
+  padding: 20px 16px 8px;
+  font-size: 10px;
+}
+
+.sig-box {
+  width: 200px;
+  text-align: center;
+}
+
+.sig-line {
+  border-bottom: 1px solid #222222;
+  margin-bottom: 4px;
+  height: 24px;
+}
+
+.sig-company-name {
+  font-size: 9.5px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
