@@ -103,8 +103,12 @@ async function generatePdfFromHtml(html, options = {}) {
     }
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn('[pdf.service] Puppeteer rendering unavailable, returning clean HTML print view:', err.message);
-    return Buffer.from(html, 'utf-8');
+    console.error('[pdf.service] Puppeteer/Chromium unavailable — PDF generation failed:', err.message);
+    // Do NOT silently return HTML disguised as a PDF.
+    // Throw so the controller can return a proper HTTP 503 error response.
+    const pdfError = new Error(`PDF generation unavailable: ${err.message}`);
+    pdfError.code = 'PDF_UNAVAILABLE';
+    throw pdfError;
   }
 }
 

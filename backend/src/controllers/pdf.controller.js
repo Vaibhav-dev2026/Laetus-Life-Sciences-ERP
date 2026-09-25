@@ -9,18 +9,28 @@ const {
   generateLedgerPdf,
 } = require('../services/pdf.service');
 
-function sendPdfResponse(res, filename, inputBuffer) {
-  res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
-  const buffer = Buffer.isBuffer(inputBuffer) ? inputBuffer : Buffer.from(inputBuffer || []);
-  const isPdf = buffer.length > 5 && buffer.subarray(0, 5).toString('utf-8') === '%PDF-';
-  const mimeType = isPdf ? 'application/pdf' : 'text/html; charset=utf-8';
-  const ext = isPdf ? '.pdf' : '.html';
-  const cleanFilename = filename.replace(/\.pdf$/i, '') + ext;
+function sendPdfResponse(res, filename, buffer) {
+  // Defensive: verify the buffer is genuinely a PDF (starts with %PDF-)
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  const isPdf = buf.length > 5 && buf.subarray(0, 5).toString('utf-8') === '%PDF-';
 
-  res.setHeader('Content-Type', mimeType);
+  if (!isPdf) {
+    // PDF generation produced non-PDF output — never serve it as a PDF.
+    // eslint-disable-next-line no-console
+    console.error('[pdf.controller] sendPdfResponse: buffer does not begin with %PDF- — aborting. First bytes:', buf.subarray(0, 20).toString('utf-8'));
+    return res.status(503).json({
+      success: false,
+      message: 'PDF generation failed on the server. The document could not be rendered as PDF.',
+      code: 'PDF_UNAVAILABLE',
+    });
+  }
+
+  const cleanFilename = filename.replace(/\.pdf$/i, '') + '.pdf';
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
+  res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${cleanFilename}"`);
-  res.setHeader('Content-Length', buffer.length);
-  return res.status(200).end(buffer);
+  res.setHeader('Content-Length', buf.length);
+  return res.status(200).end(buf);
 }
 
 // GET /api/sales/:id/pdf or /api/pdf/invoice/:id
