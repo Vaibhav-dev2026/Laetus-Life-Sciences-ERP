@@ -62,16 +62,25 @@ async function outstandingRows(query = {}) {
 }
 
 async function salesRows(query = {}) {
+  const { buildDateQuery } = require('../utils/dateRange.util');
   const filter = { status: { $ne: 'Cancelled' } };
-  if (query.from || query.to) {
-    filter.date = {};
-    if (query.from) filter.date.$gte = query.from;
-    if (query.to) filter.date.$lte = query.to;
-  }
 
-  const sales = await Sale.find(filter).sort({ date: -1 });
+  const dateQuery = buildDateQuery({ from: query.from, to: query.to, financialYear: query.financialYear });
+  if (dateQuery) filter.date = dateQuery;
+  if (query.customerId) filter.customerId = query.customerId;
+
+  let sales = await Sale.find(filter).sort({ date: -1 });
   const customers = await Customer.find({ id: { $in: sales.map((s) => s.customerId) } });
   const custMap = new Map(customers.map((c) => [c.id, c.partyName]));
+
+  if (query.search && query.search.trim()) {
+    const q = query.search.trim().toLowerCase();
+    sales = sales.filter((s) => {
+      const custName = (custMap.get(s.customerId) || s.customerId || '').toLowerCase();
+      const invNo = (s.invoiceNo || '').toLowerCase();
+      return invNo.includes(q) || custName.includes(q);
+    });
+  }
 
   const rows = sales.map((s) => ({
     invoiceNo: s.invoiceNo,
@@ -107,16 +116,25 @@ async function salesRows(query = {}) {
 }
 
 async function purchasesRows(query = {}) {
+  const { buildDateQuery } = require('../utils/dateRange.util');
   const filter = { status: { $ne: 'Cancelled' } };
-  if (query.from || query.to) {
-    filter.purchaseDate = {};
-    if (query.from) filter.purchaseDate.$gte = query.from;
-    if (query.to) filter.purchaseDate.$lte = query.to;
-  }
 
-  const purchases = await Purchase.find(filter).sort({ purchaseDate: -1 });
+  const dateQuery = buildDateQuery({ from: query.from, to: query.to, financialYear: query.financialYear });
+  if (dateQuery) filter.purchaseDate = dateQuery;
+  if (query.supplierId) filter.supplierId = query.supplierId;
+
+  let purchases = await Purchase.find(filter).sort({ purchaseDate: -1 });
   const suppliers = await Supplier.find({ id: { $in: purchases.map((p) => p.supplierId) } });
   const suppMap = new Map(suppliers.map((s) => [s.id, s.company]));
+
+  if (query.search && query.search.trim()) {
+    const q = query.search.trim().toLowerCase();
+    purchases = purchases.filter((p) => {
+      const suppName = (suppMap.get(p.supplierId) || p.supplierId || '').toLowerCase();
+      const invNo = (p.purchaseInvoiceNo || p.supplierInvoiceNo || '').toLowerCase();
+      return invNo.includes(q) || suppName.includes(q);
+    });
+  }
 
   const rows = purchases.map((p) => ({
     purchaseInvoiceNo: p.purchaseInvoiceNo,
@@ -285,119 +303,24 @@ async function productsRows() {
 }
 
 async function gstr1Rows(query = {}) {
-  const filter = { status: { $ne: 'Cancelled' } };
-  if (query.from || query.to) {
-    filter.date = {};
-    if (query.from) filter.date.$gte = query.from;
-    if (query.to) filter.date.$lte = query.to;
-  }
-  if (query.customerId) filter.customerId = query.customerId;
-  if (query.financialYear) filter.financialYear = query.financialYear;
+  const gstReportService = require('./gstReport.service');
+  const allRows = await gstReportService.getGstr1Data(query);
 
-  const sales = await Sale.find(filter).sort({ date: -1 });
-  const customers = await Customer.find({ id: { $in: sales.map((s) => s.customerId) } });
-  const custMap = new Map(customers.map((c) => [c.id, c]));
-
-  // GSTR-1 requires rate-wise reporting (5% / 12% / 18% / 28% shown
-  // separately, each with its own taxable value and tax amount) — this
-  // matches the real MARG export layout the user provided as a reference
-  // (see GSTR1_OF_OCTOBER_2025.xls: separate SGST%/CGST%/IGST% columns per
-  // row). A single invoice mixing products at different GST rates now
-  // produces one row per rate bucket instead of one blended row with no
-  // rate shown at all.
-  const rows = [];
-  for (const s of sales) {
-    const customer = custMap.get(s.customerId);
-    const custGstin = customer?.gstin?.trim() || '';
-    const hasValidGstin = Boolean(custGstin && custGstin.length >= 10 && custGstin !== '-');
-    const isInterState = Boolean(s.isInterState);
-    const invoiceVal = round2(s.grandTotal || 0);
-
-    let cat = 'B2C Small';
-    if (hasValidGstin) cat = 'B2B';
-    else if (isInterState && invoiceVal > 250000) cat = 'B2C Large';
-
-    const byRate = new Map(); // gstRate -> accumulated bucket
-    for (const l of s.lines || []) {
-      const rate = Number(l.gstRate) || 0;
-      const bucket = byRate.get(rate) || { qty: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, hsns: new Set() };
-      bucket.qty += Number(l.qty) || 0;
-      bucket.taxable += Number(l.taxableValue) || 0;
-      bucket.cgst += Number(l.cgst) || 0;
-      bucket.sgst += Number(l.sgst) || 0;
-      bucket.igst += Number(l.igst) || 0;
-      if (l.hsn) bucket.hsns.add(l.hsn);
-      byRate.set(rate, bucket);
-    }
-
-    const rateBuckets = Array.from(byRate.entries()).sort((a, b) => a[0] - b[0]);
-
-    rateBuckets.forEach(([rate, b], idx) => {
-      const bucketCategory = (rate === 0 && b.taxable > 0) ? 'Nil Rated' : cat;
-      rows.push({
-        id: `${s.id}-${rate}`,
-        gstin: custGstin || '-',
-        customerName: customer?.partyName || s.customerId,
-        invoiceDate: dayjs(s.date).format('DD-MM-YYYY'),
-        invoiceNo: s.invoiceNo,
-        invoiceValue: idx === 0 ? invoiceVal : 0, // shown once per invoice, matching MARG's layout, to avoid double-counting the invoice total across its rate-bucket rows
-        localCentral: isInterState ? 'Central' : 'Local',
-        hsn: Array.from(b.hsns).join(', ') || '-',
-        quantity: round2(b.qty),
-        taxable: round2(b.taxable),
-        gstRatePct: rate,
-        cgstPct: isInterState ? 0 : round2(rate / 2),
-        cgst: round2(b.cgst),
-        sgstPct: isInterState ? 0 : round2(rate / 2),
-        sgst: round2(b.sgst),
-        igstPct: isInterState ? rate : 0,
-        igst: round2(b.igst),
-        totalGst: round2(b.cgst + b.sgst + b.igst),
-        category: bucketCategory,
-        financialYear: s.financialYear || currentFinancialYear(s.date),
-      });
-    });
+  let rows = Array.isArray(allRows) ? allRows : [];
+  if (query.category && query.category !== 'All') {
+    rows = rows.filter((r) => r.category === query.category);
   }
 
-  // Credit Note rows for sales returns processed in the same period —
-  // previously this was fetched with SalesReturn.find({}), completely
-  // unfiltered by date, so a GSTR-1 for any single month incorrectly
-  // included every credit note ever created, from any period.
-  const returnFilter = {};
-  if (query.from || query.to) {
-    returnFilter.createdAt = {};
-    if (query.from) returnFilter.createdAt.$gte = new Date(query.from);
-    if (query.to) returnFilter.createdAt.$lte = new Date(query.to);
-  }
-  if (query.customerId) returnFilter.customerId = query.customerId;
-  const returns = await SalesReturn.find(returnFilter).sort({ createdAt: -1 });
-  const returnCustomers = await Customer.find({ id: { $in: returns.map((r) => r.customerId) } });
-  const returnCustMap = new Map(returnCustomers.map((c) => [c.id, c]));
-  for (const r of returns) {
-    const customer = returnCustMap.get(r.customerId);
-    const refVal = round2(r.refundAmount || 0);
-    rows.push({
-      id: `credit-${r.id}`,
-      customerName: customer?.partyName || r.customerId,
-      invoiceDate: r.createdAt ? dayjs(r.createdAt).format('DD-MM-YYYY') : dayjs().format('DD-MM-YYYY'),
-      invoiceNo: `CR-${r.id}`,
-      invoiceValue: -refVal,
-      localCentral: 'Local',
-      hsn: '-',
-      quantity: 0,
-      taxable: -refVal,
-      gstRatePct: 0,
-      cgstPct: 0,
-      cgst: 0,
-      sgstPct: 0,
-      sgst: 0,
-      igstPct: 0,
-      igst: 0,
-      totalGst: 0,
-      category: 'Credit Note',
-      financialYear: r.financialYear || currentFinancialYear(r.createdAt),
-    });
-  }
+  const formattedRows = rows.map((r) => ({
+    ...r,
+    invoiceDate: r.invoiceDate ? dayjs(r.invoiceDate).format('DD-MM-YYYY') : '-',
+    invoiceValue: round2(r.invoiceValue || 0),
+    taxable: round2(r.taxable || r.taxableValue || 0),
+    cgst: round2(r.cgst || 0),
+    sgst: round2(r.sgst || 0),
+    igst: round2(r.igst || 0),
+    totalGst: round2(r.totalGst || r.totalTax || 0),
+  }));
 
   const columns = [
     { key: 'category', label: 'Category' },
@@ -420,128 +343,31 @@ async function gstr1Rows(query = {}) {
     { key: 'totalGst', label: 'Total GST' },
   ];
 
-  return { title: 'GSTR-1 Outward Supplies Report', columns, rows };
+  return { title: 'GSTR-1 Outward Supplies Report', columns, rows: formattedRows };
 }
 
 async function itcRows(query = {}) {
-  const filter = { status: { $ne: 'Cancelled' } };
-  if (query.from || query.to) {
-    filter.purchaseDate = {};
-    if (query.from) filter.purchaseDate.$gte = query.from;
-    if (query.to) filter.purchaseDate.$lte = query.to;
-  }
-  if (query.supplierId) filter.supplierId = query.supplierId;
-  if (query.financialYear) filter.financialYear = query.financialYear;
+  const gstReportService = require('./gstReport.service');
+  const recoData = await gstReportService.getGstr2bReconciliationData(query);
 
-  const purchases = await Purchase.find(filter).sort({ purchaseDate: -1 });
-  const suppliers = await Supplier.find({ id: { $in: purchases.map((p) => p.supplierId) } });
-  const suppMap = new Map(suppliers.map((s) => [s.id, s]));
-
-  // Matches the real MARG GSTR-2 export layout the user provided as a
-  // reference (GSTR2_OF_AUGUST.xls: separate SGST%/CGST%/IGST% columns and
-  // a Quantity column per row) and, like GSTR-1, breaks a purchase invoice
-  // mixing products at different GST rates into one row per rate bucket
-  // instead of a single blended row with no rate shown.
-  const rows = [];
-  for (const p of purchases) {
-    const supplier = suppMap.get(p.supplierId);
-    const suppGstin = supplier?.gstin?.trim() || '';
-    const hasGstin = Boolean(suppGstin && suppGstin.length >= 10 && suppGstin !== '-');
-    const invoiceVal = round2(p.grandTotal || 0);
-
-    const rcm = p.rcm ? 'Yes' : 'No';
-    const eligibility = p.itcEligibility || (hasGstin ? 'Eligible' : 'Ineligible');
-    let recStatus = 'Pending';
-    if (eligibility === 'Ineligible' || eligibility === 'Blocked') {
-      recStatus = 'Not Eligible';
-    } else if (hasGstin && (p.paymentStatus === 'Paid' || p.paymentStatus === 'Partial')) {
-      recStatus = 'Matched';
-    } else if (!hasGstin) {
-      recStatus = 'Unmatched';
-    }
-
-    const byRate = new Map();
-    for (const l of p.lines || []) {
-      const rate = Number(l.gstRate) || 0;
-      const bucket = byRate.get(rate) || { qty: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0, hsns: new Set() };
-      bucket.qty += Number(l.qty) || 0;
-      bucket.taxable += Number(l.taxableValue) || 0;
-      bucket.cgst += Number(l.cgst) || 0;
-      bucket.sgst += Number(l.sgst) || 0;
-      bucket.igst += Number(l.igst) || 0;
-      if (l.hsn) bucket.hsns.add(l.hsn);
-      byRate.set(rate, bucket);
-    }
-
-    const rateBuckets = Array.from(byRate.entries()).sort((a, b) => a[0] - b[0]);
-    rateBuckets.forEach(([rate, b], idx) => {
-      const totalTax = round2(b.cgst + b.sgst + b.igst);
-      const itcEligibleAmount = (recStatus === 'Not Eligible' || eligibility === 'Ineligible') ? 0 : totalTax;
-      rows.push({
-        id: `${p.id}-${rate}`,
-        supplierGstin: suppGstin || '-',
-        supplierName: supplier?.company || p.supplierId,
-        invoiceNo: p.purchaseInvoiceNo,
-        invoiceDate: dayjs(p.purchaseDate).format('DD-MM-YYYY'),
-        invoiceValue: idx === 0 ? invoiceVal : 0, // shown once per invoice, to avoid double-counting in summary totals
-        hsn: Array.from(b.hsns).join(', ') || '-',
-        quantity: round2(b.qty),
-        taxable: round2(b.taxable),
-        gstRatePct: rate,
-        cgst: round2(b.cgst),
-        sgst: round2(b.sgst),
-        igst: round2(b.igst),
-        totalTax,
-        rcm,
-        itcEligibility: eligibility,
-        itcEligible: itcEligibleAmount,
-        status: recStatus,
-        financialYear: p.financialYear || currentFinancialYear(p.purchaseDate),
-      });
-    });
+  let rows = Array.isArray(recoData) ? recoData : (recoData.rows || []);
+  if (query.status && query.status !== 'All') {
+    rows = rows.filter((r) => r.status === query.status);
   }
 
-  // Purchase Return debit-note rows, filtered to the same period — this
-  // export previously did not include returns at all (a separate, silently
-  // diverging implementation from the on-screen ITC Reconciliation page,
-  // which did include them; see gst.controller.js).
-  const returnFilter = {};
-  if (query.from || query.to) {
-    returnFilter.createdAt = {};
-    if (query.from) returnFilter.createdAt.$gte = new Date(query.from);
-    if (query.to) returnFilter.createdAt.$lte = new Date(query.to);
-  }
-  if (query.supplierId) returnFilter.supplierId = query.supplierId;
-  const pReturns = await PurchaseReturn.find(returnFilter).sort({ createdAt: -1 });
-  const returnSuppliers = await Supplier.find({ id: { $in: pReturns.map((r) => r.supplierId) } });
-  const returnSuppMap = new Map(returnSuppliers.map((s) => [s.id, s]));
-  for (const pr of pReturns) {
-    const supplier = returnSuppMap.get(pr.supplierId);
-    const adj = round2(pr.payableAdjustment || 0);
-    rows.push({
-      id: `debit-${pr.id}`,
-      supplierGstin: supplier?.gstin?.trim() || '-',
-      supplierName: supplier?.company || pr.supplierId,
-      invoiceNo: `DR-${pr.id}`,
-      invoiceDate: pr.createdAt ? dayjs(pr.createdAt).format('DD-MM-YYYY') : dayjs().format('DD-MM-YYYY'),
-      invoiceValue: -adj,
-      hsn: '-',
-      quantity: 0,
-      taxable: -adj,
-      gstRatePct: 0,
-      cgst: 0,
-      sgst: 0,
-      igst: 0,
-      totalTax: 0,
-      rcm: 'No',
-      itcEligibility: 'Eligible',
-      itcEligible: 0,
-      status: 'Matched',
-      financialYear: pr.financialYear || currentFinancialYear(pr.createdAt),
-    });
-  }
+  const formattedRows = rows.map((r) => ({
+    ...r,
+    invoiceDate: r.invoiceDate ? dayjs(r.invoiceDate).format('DD-MM-YYYY') : '-',
+    invoiceValue: round2(r.invoiceValue || r.bookTaxable || 0),
+    taxable: round2(r.bookTaxable || r.taxable || 0),
+    cgst: round2(r.bookCgst || r.cgst || 0),
+    sgst: round2(r.bookSgst || r.sgst || 0),
+    igst: round2(r.bookIgst || r.igst || 0),
+    totalTax: round2(r.bookTotalTax || r.totalTax || 0),
+  }));
 
   const columns = [
+    { key: 'status', label: 'Status' },
     { key: 'supplierGstin', label: 'Supplier GSTIN' },
     { key: 'supplierName', label: 'Supplier Name' },
     { key: 'invoiceNo', label: 'Invoice No' },
@@ -557,65 +383,36 @@ async function itcRows(query = {}) {
     { key: 'totalTax', label: 'Total Tax' },
     { key: 'rcm', label: 'RCM' },
     { key: 'itcEligibility', label: 'ITC Eligibility' },
-    { key: 'status', label: 'Status' },
   ];
 
-  return { title: 'Purchase ITC Reconciliation Report', columns, rows };
+  return { title: 'Purchase ITC Reconciliation Report', columns, rows: formattedRows };
 }
 
 async function gstr3bRows(query = {}) {
-  const saleFilter = { status: { $ne: 'Cancelled' } };
-  const purchaseFilter = { status: { $ne: 'Cancelled' } };
-  if (query.financialYear) {
-    saleFilter.financialYear = query.financialYear;
-    purchaseFilter.financialYear = query.financialYear;
-  }
-  if (query.from || query.to) {
-    saleFilter.date = {};
-    purchaseFilter.purchaseDate = {};
-    if (query.from) { saleFilter.date.$gte = query.from; purchaseFilter.purchaseDate.$gte = query.from; }
-    if (query.to) { saleFilter.date.$lte = query.to; purchaseFilter.purchaseDate.$lte = query.to; }
-  }
+  const gstReportService = require('./gstReport.service');
+  const data = await gstReportService.getGstr3bData(query);
 
-  const sales = await Sale.find(saleFilter);
-  const purchases = await Purchase.find(purchaseFilter);
+  const outwardTaxable = round2(data?.section31?.outwardTaxable ?? data?.outwardTaxable ?? 0);
+  const outputCgst = round2(data?.section31?.cgst ?? data?.outputCgst ?? 0);
+  const outputSgst = round2(data?.section31?.sgst ?? data?.outputSgst ?? 0);
+  const outputIgst = round2(data?.section31?.igst ?? data?.outputIgst ?? 0);
 
-  const outwardTaxable = round2(sales.reduce((a, s) => a + (s.taxableTotal || 0), 0));
-  const outputCgst = round2(sales.reduce((a, s) => a + (s.cgstTotal || 0), 0));
-  const outputSgst = round2(sales.reduce((a, s) => a + (s.sgstTotal || 0), 0));
-  const outputIgst = round2(sales.reduce((a, s) => a + (s.igstTotal || 0), 0));
+  const availableCgst = round2(data?.section4?.availableCgst ?? data?.eligibleCgst ?? 0);
+  const availableSgst = round2(data?.section4?.availableSgst ?? data?.eligibleSgst ?? 0);
+  const availableIgst = round2(data?.section4?.availableIgst ?? data?.eligibleIgst ?? 0);
+  const reversalCgst = round2(data?.section4?.reversalCgst ?? 0);
+  const reversalSgst = round2(data?.section4?.reversalSgst ?? 0);
 
-  let eligibleCgst = 0;
-  let eligibleSgst = 0;
-  let eligibleIgst = 0;
-  let ineligibleItc = 0;
-
-  purchases.forEach((p) => {
-    const isEligible = p.itcEligibility !== 'Ineligible' && p.itcEligibility !== 'Blocked';
-    if (isEligible) {
-      eligibleIgst += p.igstTotal || 0;
-      eligibleCgst += p.cgstTotal || 0;
-      eligibleSgst += p.sgstTotal || 0;
-    } else {
-      ineligibleItc += (p.cgstTotal || 0) + (p.sgstTotal || 0) + (p.igstTotal || 0);
-    }
-  });
-
-  eligibleCgst = round2(eligibleCgst);
-  eligibleSgst = round2(eligibleSgst);
-  eligibleIgst = round2(eligibleIgst);
-  ineligibleItc = round2(ineligibleItc);
-
-  const netCgst = Math.max(0, outputCgst - eligibleCgst);
-  const netSgst = Math.max(0, outputSgst - eligibleSgst);
-  const netIgst = Math.max(0, outputIgst - eligibleIgst);
-  const netPayable = round2(netCgst + netSgst + netIgst);
+  const netCgst = round2(data?.netPayable?.cgst ?? 0);
+  const netSgst = round2(data?.netPayable?.sgst ?? 0);
+  const netIgst = round2(data?.netPayable?.igst ?? 0);
+  const netPayableTotal = round2(data?.netPayable?.totalNetPayable ?? data?.netTaxPayable ?? 0);
 
   const rows = [
     { section: '3.1 Outward Taxable Supplies', taxable: outwardTaxable, igst: outputIgst, cgst: outputCgst, sgst: outputSgst, netPayable: '-' },
-    { section: '4.0 Eligible Input Tax Credit', taxable: '-', igst: eligibleIgst, cgst: eligibleCgst, sgst: eligibleSgst, netPayable: '-' },
-    { section: '4.D Ineligible / Blocked ITC', taxable: '-', igst: 0, cgst: 0, sgst: 0, netPayable: ineligibleItc },
-    { section: '6.1 Net Tax Payable in Cash', taxable: '-', igst: netIgst, cgst: netCgst, sgst: netSgst, netPayable },
+    { section: '4.0 Eligible Input Tax Credit (ITC)', taxable: '-', igst: availableIgst, cgst: availableCgst, sgst: availableSgst, netPayable: '-' },
+    { section: '4.D Ineligible / Reversal ITC', taxable: '-', igst: 0, cgst: reversalCgst, sgst: reversalSgst, netPayable: round2(reversalCgst + reversalSgst) },
+    { section: '6.1 Net Tax Payable in Cash', taxable: '-', igst: netIgst, cgst: netCgst, sgst: netSgst, netPayable: netPayableTotal },
   ];
 
   const columns = [

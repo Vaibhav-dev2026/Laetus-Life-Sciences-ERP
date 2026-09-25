@@ -73,7 +73,7 @@ export default function SalesList() {
         description="GST invoices raised to customers."
         actions={(
           <>
-            <ExportActions reportKey="sales" filename="sales_invoices" />
+            <ExportActions reportKey="sales" filename="sales_invoices" params={{ search }} />
             <button className="btn btn-primary" onClick={() => navigate('/sales/new')}>+ New Invoice</button>
           </>
         )}

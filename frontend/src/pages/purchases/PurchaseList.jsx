@@ -74,7 +74,7 @@ export default function PurchaseList() {
         description="Record stock inward from suppliers."
         actions={(
           <>
-            <ExportActions reportKey="purchases" filename="purchases" />
+            <ExportActions reportKey="purchases" filename="purchases" params={{ search }} />
             <button className="btn btn-primary" onClick={() => navigate('/purchases/new')}>+ New Purchase</button>
           </>
         )}

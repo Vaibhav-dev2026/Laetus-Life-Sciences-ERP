@@ -392,11 +392,30 @@ async function getGstr3bData({ period, financialYear, from, to }) {
     }
   }
 
+  const srFilter = {};
+  const prFilter = {};
+  if (saleDateFilter) srFilter.createdAt = saleDateFilter;
+  if (purchaseDateFilter) prFilter.createdAt = purchaseDateFilter;
+
+  if (financialYear) {
+    const fyParsed = parseFinancialYear(financialYear);
+    if (fyParsed) {
+      srFilter.$or = [
+        { financialYear: { $in: [fyParsed.shortFy, fyParsed.fullFy] } },
+        { createdAt: { $gte: fyParsed.startDate, $lte: fyParsed.endDate } },
+      ];
+      prFilter.$or = [
+        { financialYear: { $in: [fyParsed.shortFy, fyParsed.fullFy] } },
+        { createdAt: { $gte: fyParsed.startDate, $lte: fyParsed.endDate } },
+      ];
+    }
+  }
+
   const [sales, purchases, salesReturns, purchaseReturns] = await Promise.all([
     Sale.find(saleFilter).lean(),
     Purchase.find(purchaseFilter).lean(),
-    SalesReturn.find().lean(),
-    PurchaseReturn.find().lean(),
+    SalesReturn.find(srFilter).lean(),
+    PurchaseReturn.find(prFilter).lean(),
   ]);
 
   let outwardTaxable = sales.reduce((a, s) => a + (s.taxableTotal || 0), 0);
