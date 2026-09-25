@@ -138,34 +138,7 @@ async function buildTargetSet() {
     }
   }
 
-  // 5. Transactions tied to demo entities (query only — no deletion)
-  const demoCustIds  = demoCustomers.map((c) => c.id);
-  const demoSuppIds  = demoSuppliers.map((s) => s.id);
-  const demoBatchIds = demoBatches.map((b) => b.id);
-
-  const [
-    demoSales,
-    demoPurchases,
-    demoSalesReturns,
-    demoPurchaseReturns,
-    demoStockMovementsCount,
-    demoCustLedgersCount,
-    demoSuppLedgersCount,
-  ] = await Promise.all([
-    Sale.find({ $or: [{ customerId: { $in: demoCustIds } }, { 'lines.productId': { $in: demoProdIds } }] })
-        .select('_id id invoiceNo customerId').lean(),
-    Purchase.find({ $or: [{ supplierId: { $in: demoSuppIds } }, { 'lines.productId': { $in: demoProdIds } }] })
-            .select('_id id purchaseInvoiceNo supplierId').lean(),
-    SalesReturn.find({ $or: [{ customerId: { $in: demoCustIds } }, { productId: { $in: demoProdIds } }] })
-               .select('_id id customerId').lean(),
-    PurchaseReturn.find({ $or: [{ supplierId: { $in: demoSuppIds } }, { productId: { $in: demoProdIds } }] })
-                  .select('_id id supplierId').lean(),
-    StockMovement.countDocuments({ batchId: { $in: demoBatchIds } }),
-    CustomerLedger.countDocuments({ partyId: { $in: demoCustIds } }),
-    SupplierLedger.countDocuments({ partyId: { $in: demoSuppIds } }),
-  ]);
-
-  // 6. Safety check — protected records must NOT be in any demo list
+  // 5. Protected entity lookup FIRST for explicit exclusion
   const realCustomer = await Customer.findOne({ partyName: PROTECTED.customerNames[0] }).lean();
   const realSupplier = await Supplier.findOne({ $or: [{ company: PROTECTED.supplierNames[0] }, { partyName: PROTECTED.supplierNames[0] }] }).lean();
   const realProduct  = await Product.findOne({ name: PROTECTED.productNames[0] }).lean();
@@ -176,15 +149,70 @@ async function buildTargetSet() {
     'ALPHILANIC-625':          realProduct  ? 'FOUND ✓' : 'NOT FOUND — ABORT',
   };
 
-  // Hard abort if protected records are missing or contaminated
+  // Hard abort if protected records are missing
   if (!realCustomer || !realSupplier || !realProduct) {
     throw new Error('SAFETY ABORT: One or more protected real records not found in the database. Cleanup aborted.');
   }
 
+  const protectedCustIds = [realCustomer.id, realCustomer._id?.toString()].filter(Boolean);
+  const protectedSuppIds = [realSupplier.id, realSupplier._id?.toString()].filter(Boolean);
+  const protectedProdIds = [realProduct.id, realProduct._id?.toString()].filter(Boolean);
+
+  const demoCustIds  = demoCustomers.map((c) => c.id);
+  const demoSuppIds  = demoSuppliers.map((s) => s.id);
+  const demoBatchIds = demoBatches.map((b) => b.id);
+
+  // 6. Transactions tied to demo entities with STRICT protected exclusions
+  const allSales = await Sale.find({}).select('_id id invoiceNo customerId lines').lean();
+  const demoSales = allSales.filter((s) => {
+    if (protectedCustIds.includes(s.customerId)) return false;
+    const hasProtectedProd = (s.lines || []).some((l) => protectedProdIds.includes(l.productId));
+    if (hasProtectedProd) return false;
+    const isDemoCust = demoCustIds.includes(s.customerId);
+    const allDemoProds = (s.lines || []).length > 0 && (s.lines || []).every((l) => demoProdIds.includes(l.productId));
+    return isDemoCust || allDemoProds;
+  });
+
+  const allPurchases = await Purchase.find({}).select('_id id purchaseInvoiceNo supplierId lines').lean();
+  const demoPurchases = allPurchases.filter((p) => {
+    if (protectedSuppIds.includes(p.supplierId)) return false;
+    const hasProtectedProd = (p.lines || []).some((l) => protectedProdIds.includes(l.productId));
+    if (hasProtectedProd) return false;
+    const isDemoSupp = demoSuppIds.includes(p.supplierId);
+    const allDemoProds = (p.lines || []).length > 0 && (p.lines || []).every((l) => demoProdIds.includes(l.productId));
+    return isDemoSupp || allDemoProds;
+  });
+
+  const allSalesReturns = await SalesReturn.find({}).select('_id id customerId productId').lean();
+  const demoSalesReturns = allSalesReturns.filter((r) => {
+    if (protectedCustIds.includes(r.customerId)) return false;
+    if (protectedProdIds.includes(r.productId)) return false;
+    return demoCustIds.includes(r.customerId) || demoProdIds.includes(r.productId);
+  });
+
+  const allPurchaseReturns = await PurchaseReturn.find({}).select('_id id supplierId productId').lean();
+  const demoPurchaseReturns = allPurchaseReturns.filter((r) => {
+    if (protectedSuppIds.includes(r.supplierId)) return false;
+    if (protectedProdIds.includes(r.productId)) return false;
+    return demoSuppIds.includes(r.supplierId) || demoProdIds.includes(r.productId);
+  });
+
+  const [
+    demoStockMovementsCount,
+    demoCustLedgersCount,
+    demoSuppLedgersCount,
+  ] = await Promise.all([
+    StockMovement.countDocuments({ batchId: { $in: demoBatchIds } }),
+    CustomerLedger.countDocuments({ partyId: { $in: demoCustIds, $nin: protectedCustIds } }),
+    SupplierLedger.countDocuments({ partyId: { $in: demoSuppIds, $nin: protectedSuppIds } }),
+  ]);
+
   const contaminated =
     demoCustIds.includes(realCustomer.id) ||
     demoSuppIds.includes(realSupplier.id) ||
-    demoProdIds.includes(realProduct.id);
+    demoProdIds.includes(realProduct.id) ||
+    demoSales.some((s) => protectedCustIds.includes(s.customerId)) ||
+    demoPurchases.some((p) => protectedSuppIds.includes(p.supplierId));
 
   if (contaminated) {
     throw new Error('SAFETY ABORT: Protected real records were found in the demo deletion target set. Cleanup aborted.');

@@ -113,14 +113,52 @@ async function runCleanDemoData() {
     }
   }
 
-  // ── 5. Predict transactional impact ───────────────────────────────────────
-  const salesToRemove = await Sale.find({ $or: [{ customerId: { $in: demoCustomerIds } }, { 'lines.productId': { $in: demoProductIds } }] });
-  const purchasesToRemove = await Purchase.find({ $or: [{ supplierId: { $in: demoSupplierIds } }, { 'lines.productId': { $in: demoProductIds } }] });
-  const salesReturnsToRemove = await SalesReturn.find({ $or: [{ customerId: { $in: demoCustomerIds } }, { productId: { $in: demoProductIds } }] });
-  const purchaseReturnsToRemove = await PurchaseReturn.find({ $or: [{ supplierId: { $in: demoSupplierIds } }, { productId: { $in: demoProductIds } }] });
+  // ── 5. Predict transactional impact with protected exclusions ─────────────
+  const realCustomer = await Customer.findOne({ partyName: /sunil children hospital/i });
+  const realSupplier = await Supplier.findOne({ company: /alphine pharma/i });
+  const realProduct  = await Product.findOne({ name: /alphilanic/i });
+
+  const protectedCustIds = [realCustomer?.id, realCustomer?._id?.toString()].filter(Boolean);
+  const protectedSuppIds = [realSupplier?.id, realSupplier?._id?.toString()].filter(Boolean);
+  const protectedProdIds = [realProduct?.id, realProduct?._id?.toString()].filter(Boolean);
+
+  const allSales = await Sale.find({});
+  const salesToRemove = allSales.filter((s) => {
+    if (protectedCustIds.includes(s.customerId)) return false;
+    const hasProtectedProd = (s.lines || []).some((l) => protectedProdIds.includes(l.productId));
+    if (hasProtectedProd) return false;
+    const isDemoCust = demoCustomerIds.includes(s.customerId);
+    const allDemoProds = (s.lines || []).length > 0 && (s.lines || []).every((l) => demoProductIds.includes(l.productId));
+    return isDemoCust || allDemoProds;
+  });
+
+  const allPurchases = await Purchase.find({});
+  const purchasesToRemove = allPurchases.filter((p) => {
+    if (protectedSuppIds.includes(p.supplierId)) return false;
+    const hasProtectedProd = (p.lines || []).some((l) => protectedProdIds.includes(l.productId));
+    if (hasProtectedProd) return false;
+    const isDemoSupp = demoSupplierIds.includes(p.supplierId);
+    const allDemoProds = (p.lines || []).length > 0 && (p.lines || []).every((l) => demoProductIds.includes(l.productId));
+    return isDemoSupp || allDemoProds;
+  });
+
+  const allSalesReturns = await SalesReturn.find({});
+  const salesReturnsToRemove = allSalesReturns.filter((r) => {
+    if (protectedCustIds.includes(r.customerId)) return false;
+    if (protectedProdIds.includes(r.productId)) return false;
+    return demoCustomerIds.includes(r.customerId) || demoProductIds.includes(r.productId);
+  });
+
+  const allPurchaseReturns = await PurchaseReturn.find({});
+  const purchaseReturnsToRemove = allPurchaseReturns.filter((r) => {
+    if (protectedSuppIds.includes(r.supplierId)) return false;
+    if (protectedProdIds.includes(r.productId)) return false;
+    return demoSupplierIds.includes(r.supplierId) || demoProductIds.includes(r.productId);
+  });
+
   const stockMovementsToRemove = await StockMovement.countDocuments({ batchId: { $in: demoBatchIds } });
-  const custLedgersToRemove = await CustomerLedger.countDocuments({ partyId: { $in: demoCustomerIds } });
-  const suppLedgersToRemove = await SupplierLedger.countDocuments({ partyId: { $in: demoSupplierIds } });
+  const custLedgersToRemove = await CustomerLedger.countDocuments({ partyId: { $in: demoCustomerIds, $nin: protectedCustIds } });
+  const suppLedgersToRemove = await SupplierLedger.countDocuments({ partyId: { $in: demoSupplierIds, $nin: protectedSuppIds } });
 
   console.log('\n── TRANSACTIONS THAT WOULD BE REMOVED ──');
   console.log(`  Demo Sales Invoices:       ${salesToRemove.length}`);
