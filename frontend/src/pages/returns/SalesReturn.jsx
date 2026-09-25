@@ -35,11 +35,19 @@ export default function SalesReturn() {
   const lineIndex = invoice?.lines.findIndex((l, i) => `${invoiceId}-${i}` === lineId);
   const line = lineIndex != null && lineIndex >= 0 ? invoice?.lines[lineIndex] : undefined;
 
+  const previouslyReturned = (line && returns)
+    ? returns.filter((r) => r.saleId === invoiceId && r.productId === line.productId && r.batchId === line.batchId).reduce((a, b) => a + Number(b.qty || 0), 0)
+    : 0;
+  const maxReturnable = line ? Math.max(0, line.qty - previouslyReturned) : 0;
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!invoice || !line) { toast.error('Select an invoice and product line to return.'); return; }
     if (!returnQty || Number(returnQty) <= 0) { toast.error('Enter a valid return quantity.'); return; }
-    if (Number(returnQty) > line.qty) { toast.error('Return quantity cannot exceed the originally sold quantity.'); return; }
+    if (Number(returnQty) > maxReturnable) {
+      toast.error(`Return quantity (${returnQty}) exceeds available returnable quantity (${maxReturnable}).`);
+      return;
+    }
     setSubmitting(true);
     try {
       await returnApi.createSalesReturn({ saleId: invoiceId, lineIndex, qty: Number(returnQty), reason });
@@ -71,11 +79,23 @@ export default function SalesReturn() {
           <FormField label="Product / Batch" required>
             <select className="form-control" value={lineId} onChange={(e) => setLineId(e.target.value)} disabled={!invoice}>
               <option value="">Select product line</option>
-              {invoice?.lines.map((l, i) => <option key={i} value={`${invoiceId}-${i}`}>{productName(l.productId)} — Batch {l.batchNo || l.batchId} (Sold {l.qty})</option>)}
+              {invoice?.lines.map((l, i) => {
+                const retQty = returns ? returns.filter((r) => r.saleId === invoiceId && r.productId === l.productId && r.batchId === l.batchId).reduce((a, b) => a + Number(b.qty || 0), 0) : 0;
+                const rem = Math.max(0, l.qty - retQty);
+                return (
+                  <option key={i} value={`${invoiceId}-${i}`} disabled={rem <= 0}>
+                    {productName(l.productId)} — Batch {l.batchNo || l.batchId} (Available: {rem} / Sold: {l.qty})
+                  </option>
+                );
+              })}
             </select>
           </FormField>
-          <FormField label="Sold Quantity"><input className="form-control" value={line?.qty ?? ''} disabled /></FormField>
-          <FormField label="Return Quantity" required><input type="number" min="1" max={line?.qty} className="form-control" value={returnQty} onChange={(e) => setReturnQty(e.target.value)} /></FormField>
+          <FormField label="Sold Qty / Max Returnable">
+            <input className="form-control" value={line ? `Sold: ${line.qty} | Returned: ${previouslyReturned} | Available: ${maxReturnable}` : ''} disabled />
+          </FormField>
+          <FormField label="Return Quantity" required>
+            <input type="number" min="1" max={maxReturnable} className="form-control" value={returnQty} onChange={(e) => setReturnQty(e.target.value)} disabled={!line || maxReturnable <= 0} />
+          </FormField>
           <FormField label="Return Reason">
             <select className="form-control" value={reason} onChange={(e) => setReason(e.target.value)}>
               <option value="">Select reason</option>

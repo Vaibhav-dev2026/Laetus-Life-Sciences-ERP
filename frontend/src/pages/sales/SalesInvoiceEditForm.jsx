@@ -239,7 +239,23 @@ export default function SalesInvoiceEditForm() {
                 <td><input type="number" className="form-control" style={{ width: 60 }} min={0} value={l.freeQty} onChange={(e) => updateLine(l.rowId, { freeQty: Number(e.target.value) })} /></td>
                 <td><input type="number" className="form-control" style={{ width: 80 }} min={0} step={0.01} value={l.rate} onChange={(e) => updateLine(l.rowId, { rate: Number(e.target.value) })} /></td>
                 <td><input type="number" className="form-control" style={{ width: 65 }} min={0} max={100} step={0.01} value={l.discountPct} onChange={(e) => updateLine(l.rowId, { discountPct: Number(e.target.value) })} /></td>
-                <td><input type="number" className="form-control" style={{ width: 65 }} min={0} value={l.gstRate} onChange={(e) => updateLine(l.rowId, { gstRate: Number(e.target.value) })} /></td>
+                <td>
+                  <select
+                    className="form-control"
+                    style={{ width: 72 }}
+                    value={l.gstRate}
+                    onChange={(e) => updateLine(l.rowId, { gstRate: Number(e.target.value) })}
+                  >
+                    <option value={0}>0%</option>
+                    <option value={5}>5%</option>
+                    <option value={12}>12%</option>
+                    <option value={18}>18%</option>
+                    <option value={28}>28%</option>
+                    {![0, 5, 12, 18, 28].includes(Number(l.gstRate)) && (
+                      <option value={l.gstRate}>{l.gstRate}%</option>
+                    )}
+                  </select>
+                </td>
                 <td className="text-end mono">{formatCurrency(l.taxableValue)}</td>
                 <td className="text-end mono">{formatCurrency(l.cgst)}</td>
                 <td className="text-end mono">{formatCurrency(l.sgst)}</td>

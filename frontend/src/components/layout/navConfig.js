@@ -56,6 +56,7 @@ export const NAV_SECTIONS = [
     roles: ['Admin'],
     items: [
       { label: 'Company Settings', icon: '⚙️', path: '/settings/company' },
+      { label: 'Audit Logs', icon: '📝', path: '/audit-logs' },
       { label: 'My Account', icon: '🛡️', path: '/settings/account' },
       { label: 'Database Maintenance', icon: '🗄️', path: '/settings/maintenance' },
       { label: 'Backup', icon: '💾', path: '/settings/backup' },

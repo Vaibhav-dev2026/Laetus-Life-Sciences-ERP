@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 
-// Connect to MongoDB
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/laetus_erp';
+const env = require('../config/env');
+const MONGO_URI = env.mongoUri || 'mongodb://127.0.0.1:27017/laetus_erp';
 
 async function runReleaseVerificationAndCleanup() {
   console.log('=== STARTING PRODUCTION RELEASE & CLEANUP SUITE ===');

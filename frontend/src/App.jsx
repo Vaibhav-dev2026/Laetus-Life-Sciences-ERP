@@ -51,6 +51,7 @@ const ITCReconciliation = lazy(() => import('./pages/gst/ITCReconciliation.jsx')
 const GSTR3B = lazy(() => import('./pages/gst/GSTR3B.jsx'));
 const GSTReportsCenter = lazy(() => import('./pages/gst/GSTReportsCenter.jsx'));
 
+const AuditLogs = lazy(() => import('./pages/audit/AuditLogs.jsx'));
 const CompanySettings = lazy(() => import('./pages/company/CompanySettings.jsx'));
 const MyAccount = lazy(() => import('./pages/users/MyAccount.jsx'));
 const DatabaseMaintenance = lazy(() => import('./pages/maintenance/DatabaseMaintenance.jsx'));
@@ -118,7 +119,7 @@ export default function App() {
             <Route path="/gst/itc-reconciliation" element={<ITCReconciliation />} />
             <Route path="/gst/gstr3b" element={<GSTR3B />} />
 
-            <Route path="/audit-logs" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/audit-logs" element={<ProtectedRoute roles={['Admin']}><AuditLogs /></ProtectedRoute>} />
             <Route path="/notifications" element={<NotificationCenter />} />
 
             <Route path="/settings/company" element={<ProtectedRoute roles={['Admin']}><CompanySettings /></ProtectedRoute>} />

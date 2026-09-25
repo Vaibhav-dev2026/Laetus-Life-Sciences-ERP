@@ -9,6 +9,17 @@ async function connectDB() {
 
   mongoose.set('strictQuery', true);
 
+  const validation = env.validateMongoUri(env.mongoUri, env.nodeEnv);
+  if (!validation.valid) {
+    // eslint-disable-next-line no-console
+    console.error(`[db] CRITICAL MONGO_URI VALIDATION ERROR: ${validation.reason}`);
+    if (env.nodeEnv === 'production') {
+      // eslint-disable-next-line no-console
+      console.error('[db] Terminating production startup due to malformed MONGO_URI.');
+      process.exit(1);
+    }
+  }
+
   const connectWithRetry = async (retriesLeft = 2) => {
     try {
       const opts = {
@@ -22,7 +33,12 @@ async function connectDB() {
       // eslint-disable-next-line no-console
       console.log(`[db] MongoDB connected → ${mongoose.connection.host}/${mongoose.connection.name}`);
     } catch (err) {
-      console.error(`[db] Connection failed to ${env.mongoUri}: ${err.message}`);
+      // eslint-disable-next-line no-console
+      console.error(`[db] Connection failed to ${env.sanitizedMongoUri}: ${err.message}`);
+      if (err.message.includes('ENOTFOUND') || err.message.includes('querySrv') || err.message.includes('EREFUSED')) {
+        // eslint-disable-next-line no-console
+        console.error('[db] Connection Error Diagnostic: If using reserved characters in database username or password (e.g. @, :, /, #, ?), ensure they are URL-encoded (e.g., "@" -> "%40", ":" -> "%3A", "/" -> "%2F"). Also verify Atlas Network Access / CIDR IP whitelisting.');
+      }
       if (env.nodeEnv !== 'production') {
         try {
           console.log('[db] Primary connection failed. Trying local MongoDB fallback (mongodb://127.0.0.1:27017/laetus_erp)…');
@@ -38,7 +54,7 @@ async function connectDB() {
           const mongod = await MongoMemoryServer.create();
           const uri = mongod.getUri();
           await mongoose.connect(uri);
-          console.log(`[db] In-memory MongoDB connected → ${uri}`);
+          console.log(`[db] In-memory MongoDB connected → ${env.sanitizeMongoUri(uri)}`);
           return;
         } catch (memErr) {
           console.error('[db] In-memory fallback failed:', memErr.message);

@@ -23,20 +23,55 @@ function getSystemChromePath() {
   return null;
 }
 
+let sparticuzChromium = null;
+try {
+  sparticuzChromium = require('@sparticuz/chromium');
+} catch (_) {
+  sparticuzChromium = null;
+}
+
 async function launchBrowser() {
   const launchArgs = {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+    ],
   };
 
-  // Optional priority: an explicit PUPPETEER_EXECUTABLE_PATH env var if file exists on disk
+  // 1. Priority: Explicit PUPPETEER_EXECUTABLE_PATH env var if file exists on disk
   if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
     return await puppeteer.launch({ ...launchArgs, executablePath: process.env.PUPPETEER_EXECUTABLE_PATH });
   }
 
+  // 2. Serverless / Linux Container Priority (@sparticuz/chromium)
+  if (sparticuzChromium && process.platform === 'linux') {
+    try {
+      const execPath = await sparticuzChromium.executablePath();
+      if (execPath) {
+        return await puppeteer.launch({
+          args: [...sparticuzChromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
+          defaultViewport: sparticuzChromium.defaultViewport,
+          executablePath: execPath,
+          headless: sparticuzChromium.headless,
+        });
+      }
+    } catch (cErr) {
+      // eslint-disable-next-line no-console
+      console.warn('[pdf.service] @sparticuz/chromium launch attempt:', cErr.message);
+    }
+  }
+
+  // 3. Standard puppeteer launch
   try {
     return await puppeteer.launch(launchArgs);
   } catch (err) {
+    // 4. System Chrome fallback
     const systemPath = getSystemChromePath();
     if (systemPath) {
       return await puppeteer.launch({ ...launchArgs, executablePath: systemPath });
@@ -47,7 +82,7 @@ async function launchBrowser() {
 
 /**
  * Universal PDF generator with system Chrome auto-detection.
- * Returns Buffer (PDF binary starting with %PDF- or HTML fallback string buffer).
+ * Returns Buffer (PDF binary starting with %PDF- or clean HTML string buffer).
  */
 async function generatePdfFromHtml(html, options = {}) {
   try {
@@ -68,9 +103,8 @@ async function generatePdfFromHtml(html, options = {}) {
     }
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.warn('[pdf.service] Puppeteer rendering unavailable:', err.message);
-    const fallbackHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Document Print View</title><style>@media print { .no-print { display: none !important; } } body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; }</style></head><body><div class="no-print" style="background:#fff3cd;color:#856404;padding:12px;margin-bottom:16px;border:1px solid #ffeeba;border-radius:6px;"><strong>Note:</strong> Rendered in universal print view mode. Press Ctrl+P or click Print to print/save as PDF.</div>${html}</body></html>`;
-    return Buffer.from(fallbackHtml, 'utf-8');
+    console.warn('[pdf.service] Puppeteer rendering unavailable, returning clean HTML print view:', err.message);
+    return Buffer.from(html, 'utf-8');
   }
 }
 

@@ -41,9 +41,16 @@ const summary = asyncHandler(async (req, res) => {
     { $group: { _id: null, total: { $sum: '$balance' } } },
   ]);
 
-  const [payableAgg] = await Supplier.aggregate([
-    { $group: { _id: null, total: { $sum: '$openingPayable' } } }
+  const [purchasePayableAgg] = await Purchase.aggregate([
+    { $match: { status: 'Active', balance: { $gt: 0 } } },
+    { $group: { _id: null, total: { $sum: '$balance' } } },
   ]);
+
+  const [payableAgg] = await Supplier.aggregate([
+    { $group: { _id: null, total: { $sum: '$openingPayable' } } },
+  ]);
+
+  const totalSupplierPayable = round2((payableAgg?.total || 0) + (purchasePayableAgg?.total || 0));
 
   const [stockValueAgg] = await ProductBatch.aggregate([
     { $group: { _id: null, total: { $sum: { $multiply: ['$currentQty', '$purchaseRate'] } } } },
@@ -61,7 +68,7 @@ const summary = asyncHandler(async (req, res) => {
       monthlySales: round2(monthlySalesAgg?.total || 0),
       purchaseToday: round2(todayPurchaseAgg?.total || 0),
       outstandingReceivable: round2(outstandingAgg?.total || 0),
-      supplierPayable: round2(payableAgg?.total || 0),
+      supplierPayable: totalSupplierPayable,
       stockValue: round2(stockValueAgg?.total || 0),
       lowStock,
       nearExpiry,

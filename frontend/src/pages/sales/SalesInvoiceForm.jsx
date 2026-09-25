@@ -113,7 +113,7 @@ export default function SalesInvoiceForm() {
       freeQty: 0,
       rate: batch.saleRate || batch.ptr || 0,
       discountPct: 0,
-      gstRate: product.gstRate || 12,
+      gstRate: typeof product.gstRate === 'number' ? product.gstRate : 12,
       maxQty: batch.currentQty,
     }]);
     setBatchPickerProduct(null);
@@ -291,7 +291,23 @@ export default function SalesInvoiceForm() {
                         <td><input type="number" min="0" className="form-control num-input" style={{ width: 58 }} value={l.freeQty} onChange={(e) => updateLine(l.rowId, { freeQty: Number(e.target.value) || 0 })} /></td>
                         <td><input type="number" min="0" step="0.01" className="form-control num-input" value={l.rate} onChange={(e) => updateLine(l.rowId, { rate: Number(e.target.value) || 0 })} /></td>
                         <td><input type="number" min="0" max="100" step="0.5" className="form-control num-input" style={{ width: 58 }} value={l.discountPct} onChange={(e) => updateLine(l.rowId, { discountPct: Number(e.target.value) || 0 })} /></td>
-                        <td>{l.gstRate}%</td>
+                        <td>
+                          <select
+                            className="form-control num-input"
+                            style={{ width: 72 }}
+                            value={l.gstRate}
+                            onChange={(e) => updateLine(l.rowId, { gstRate: Number(e.target.value) })}
+                          >
+                            <option value={0}>0%</option>
+                            <option value={5}>5%</option>
+                            <option value={12}>12%</option>
+                            <option value={18}>18%</option>
+                            <option value={28}>28%</option>
+                            {![0, 5, 12, 18, 28].includes(Number(l.gstRate)) && (
+                              <option value={l.gstRate}>{l.gstRate}%</option>
+                            )}
+                          </select>
+                        </td>
                         <td className="amt">{formatCurrency(l.taxable)}</td>
                         <td className="amt" style={{ fontWeight: 600 }}>{formatCurrency(l.total)}</td>
                         <td><button type="button" className="btn btn-ghost btn-sm" onClick={() => removeLine(l.rowId)} aria-label="Remove line">✕</button></td>

@@ -43,7 +43,7 @@ async function run() {
   }
 
   await mongoose.connect(env.mongoUri);
-  console.log('[seed] Connected to', env.mongoUri);
+  console.log('[seed] Connected to', env.sanitizedMongoUri);
 
   await Promise.all([
     Company.deleteMany({}), Customer.deleteMany({}), Supplier.deleteMany({}),
