@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/layout/PageHeader.jsx';
@@ -45,6 +45,10 @@ export default function SalesInvoiceForm() {
   const [amountReceived, setAmountReceived] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Stable per-form-open idempotency key — prevents duplicate invoices on double-click / retry
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `sale-${Date.now()}-${Math.random()}`
+  );
 
   useEffect(() => {
     reloadCustomers();
@@ -147,6 +151,7 @@ export default function SalesInvoiceForm() {
         dueDate: dayjs().add(30, 'day').format('YYYY-MM-DD'),
         lines: computed.map(({ rowId, gross, discountAmt, taxable, cgst, sgst, igst, gstAmt, total, maxQty, ...rest }) => rest),
         amountReceived: received,
+        idempotencyKey: idempotencyKeyRef.current,
       });
       toast.success('Invoice saved successfully.');
       navigate('/sales');

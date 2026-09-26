@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Breadcrumbs from '../../components/layout/Breadcrumbs.jsx';
@@ -40,6 +40,10 @@ export default function PurchaseForm() {
   });
   const [lines, setLines] = useState([emptyLine()]);
   const [submitting, setSubmitting] = useState(false);
+  // Stable per-form-open idempotency key — prevents duplicate purchases on double-click / retry (new form only)
+  const idempotencyKeyRef = useRef(
+    isEdit ? null : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pur-${Date.now()}-${Math.random()}`)
+  );
 
   useEffect(() => {
     if (existingPurchase) {
@@ -124,6 +128,9 @@ export default function PurchaseForm() {
         amountPaid: calculatedAmountPaid,
         lines: computed.filter((l) => l.productId).map(({ rowId, gross, discountAmt, taxable, cgst, sgst, igst, gstAmt, total, ...rest }) => rest),
       };
+      if (!isEdit && idempotencyKeyRef.current) {
+        payload.idempotencyKey = idempotencyKeyRef.current;
+      }
       if (isEdit) {
         await purchaseApi.update(id, payload);
         toast.success('Purchase updated successfully.');

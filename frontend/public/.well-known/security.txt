@@ -1,0 +1,7 @@
+# Security contact for L LAETUS LIFE SCIENCES ERP
+# https://securitytxt.org/
+
+Contact: mailto:laetuslifesciences@gmail.com
+Preferred-Languages: en
+Canonical: https://laetus-life-sciences-erp-d8xm.vercel.app/.well-known/security.txt
+Policy: This ERP is a private, authenticated pharmaceutical distribution management system. Unauthorized access is prohibited. Report security vulnerabilities to the contact address above.
