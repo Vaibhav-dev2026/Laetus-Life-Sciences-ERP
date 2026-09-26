@@ -50,6 +50,7 @@ const saleSchema = new mongoose.Schema({
   cancelReason: { type: String, default: '' },
   notes: { type: String, default: '' },
   createdBy: { type: String, default: '' },
+  idempotencyKey: { type: String, sparse: true, index: true },
 }, { timestamps: true });
 
 saleSchema.index({ date: -1 });

@@ -104,16 +104,35 @@ const create = asyncHandler(async (req, res) => {
   });
   const totals = calcDocumentTotals(computedLines);
 
-  // Idempotency check: prevent duplicate sale invoice creation from rapid double-clicks or retries
-  const fifteenSecsAgo = new Date(Date.now() - 15000);
-  const existingRecentSale = await Sale.findOne({
-    customerId,
-    grandTotal: totals.grandTotal,
-    status: { $ne: 'Cancelled' },
-    createdAt: { $gte: fifteenSecsAgo },
-  });
-  if (existingRecentSale) {
-    return ApiResponse.success(res, { message: 'Invoice already created (duplicate request suppressed)', data: existingRecentSale });
+  // Request-Key Based & Line-Item Fingerprint Idempotency Protection
+  const idempotencyKey = req.headers['x-idempotency-key'] || req.headers['idempotency-key'] || req.body?.idempotencyKey || req.body?.requestId;
+
+  if (idempotencyKey && String(idempotencyKey).trim()) {
+    const keyStr = String(idempotencyKey).trim();
+    const existing = await Sale.findOne({ idempotencyKey: keyStr });
+    if (existing) {
+      if (existing.customerId !== customerId || Math.abs(existing.grandTotal - totals.grandTotal) > 0.01) {
+        return res.status(409).json({ success: false, message: 'Idempotency key conflict: key already used for a different payload' });
+      }
+      return ApiResponse.success(res, { message: 'Invoice already created (idempotent request)', data: existing });
+    }
+  } else {
+    // Fast double-click suppression (within 5 seconds) matching EXACT customer, total, and line item fingerprint
+    const fiveSecsAgo = new Date(Date.now() - 5000);
+    const lineFingerprint = lines.map(l => `${l.productId}_${l.batchId}_${l.qty}_${l.rate}`).sort().join('|');
+    const recentCandidates = await Sale.find({
+      customerId,
+      grandTotal: totals.grandTotal,
+      status: { $ne: 'Cancelled' },
+      createdAt: { $gte: fiveSecsAgo },
+    });
+    const exactDuplicate = recentCandidates.find(s => {
+      const candidateFingerprint = (s.lines || []).map(l => `${l.productId}_${l.batchId}_${l.qty}_${l.rate}`).sort().join('|');
+      return candidateFingerprint === lineFingerprint;
+    });
+    if (exactDuplicate) {
+      return ApiResponse.success(res, { message: 'Invoice already created (duplicate request suppressed)', data: exactDuplicate });
+    }
   }
 
   const saved = await withTransaction(async (session) => {
@@ -133,6 +152,7 @@ const create = asyncHandler(async (req, res) => {
       lines: computedLines.map(({ gross, discountAmt, ...rest }) => rest),
       ...totals, amountReceived, balance, paymentStatus, paymentMode: paymentMode || '',
       financialYear, createdBy: req.user?.name,
+      idempotencyKey: idempotencyKey ? String(idempotencyKey).trim() : undefined,
     }], opts);
 
     for (const line of computedLines) {

@@ -177,5 +177,55 @@ describe('Sales transaction — the flagship flow', () => {
     const batch = await ProductBatch.findOne({ id: 'BAT-000001' });
     expect(batch.currentQty).toBe(88); // 100 - 12
   });
+
+  test('sale request-key idempotency correctly handles retries, new sales, and payload conflicts', async () => {
+    const key = 'IDEM-SALE-TEST-999';
+    const payload1 = {
+      customerId: 'CUST-000001', date: '2026-08-24',
+      lines: [{ productId: 'PRD-000001', batchId: 'BAT-000001', batchNo: 'B1', qty: 5, rate: 100, gstRate: 12 }],
+      amountReceived: 0,
+    };
+
+    // 1. Initial request with idempotency key
+    const res1 = await request(app).post('/api/sales')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', key)
+      .send(payload1);
+    expect(res1.status).toBe(201);
+    const createdId = res1.body.data.id;
+
+    // 2. Retry request with SAME idempotency key -> returns existing sale without creating duplicate
+    const res2 = await request(app).post('/api/sales')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', key)
+      .send(payload1);
+    expect(res2.status).toBe(200);
+    expect(res2.body.data.id).toBe(createdId);
+
+    // 3. Different idempotency key with SAME customer and SAME total -> allowed as a NEW sale
+    const payload2 = {
+      customerId: 'CUST-000001', date: '2026-08-24',
+      lines: [{ productId: 'PRD-000001', batchId: 'BAT-000001', batchNo: 'B1', qty: 5, rate: 100, gstRate: 12 }],
+      amountReceived: 0,
+    };
+    const res3 = await request(app).post('/api/sales')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', 'IDEM-SALE-TEST-888')
+      .send(payload2);
+    expect(res3.status).toBe(201);
+    expect(res3.body.data.id).not.toBe(createdId);
+
+    // 4. Same idempotency key with CONFLICTING payload -> returns 409 Conflict
+    const conflictingPayload = {
+      customerId: 'CUST-000001', date: '2026-08-24',
+      lines: [{ productId: 'PRD-000001', batchId: 'BAT-000001', batchNo: 'B1', qty: 50, rate: 100, gstRate: 12 }],
+      amountReceived: 0,
+    };
+    const res4 = await request(app).post('/api/sales')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', key)
+      .send(conflictingPayload);
+    expect(res4.status).toBe(409);
+  });
 });
 

@@ -82,16 +82,35 @@ const create = asyncHandler(async (req, res) => {
   });
   const totals = calcDocumentTotals(computedLines);
 
-  // Idempotency check: prevent duplicate purchase creation from rapid double-clicks or retries
-  const fifteenSecsAgo = new Date(Date.now() - 15000);
-  const existingRecent = await Purchase.findOne({
-    supplierId,
-    grandTotal: totals.grandTotal,
-    status: { $ne: 'Cancelled' },
-    createdAt: { $gte: fifteenSecsAgo },
-  });
-  if (existingRecent) {
-    return ApiResponse.success(res, { message: 'Purchase already processed (duplicate request suppressed)', data: existingRecent });
+  // Request-Key Based & Line-Item Fingerprint Idempotency Protection
+  const idempotencyKey = req.headers['x-idempotency-key'] || req.headers['idempotency-key'] || req.body?.idempotencyKey || req.body?.requestId;
+
+  if (idempotencyKey && String(idempotencyKey).trim()) {
+    const keyStr = String(idempotencyKey).trim();
+    const existing = await Purchase.findOne({ idempotencyKey: keyStr });
+    if (existing) {
+      if (existing.supplierId !== supplierId || Math.abs(existing.grandTotal - totals.grandTotal) > 0.01) {
+        return res.status(409).json({ success: false, message: 'Idempotency key conflict: key already used for a different payload' });
+      }
+      return ApiResponse.success(res, { message: 'Purchase already processed (idempotent request)', data: existing });
+    }
+  } else {
+    // Fast double-click suppression (within 5 seconds) matching EXACT supplier, total, and line item fingerprint
+    const fiveSecsAgo = new Date(Date.now() - 5000);
+    const lineFingerprint = lines.map(l => `${l.productId}_${l.batchNo}_${l.qty}_${l.rate}`).sort().join('|');
+    const recentCandidates = await Purchase.find({
+      supplierId,
+      grandTotal: totals.grandTotal,
+      status: { $ne: 'Cancelled' },
+      createdAt: { $gte: fiveSecsAgo },
+    });
+    const exactDuplicate = recentCandidates.find(p => {
+      const candidateFingerprint = (p.lines || []).map(l => `${l.productId}_${l.batchNo}_${l.qty}_${l.rate}`).sort().join('|');
+      return candidateFingerprint === lineFingerprint;
+    });
+    if (exactDuplicate) {
+      return ApiResponse.success(res, { message: 'Purchase already processed (duplicate request suppressed)', data: exactDuplicate });
+    }
   }
 
   if (supplierInvoiceNo && String(supplierInvoiceNo).trim()) {
@@ -101,7 +120,7 @@ const create = asyncHandler(async (req, res) => {
       status: { $ne: 'Cancelled' },
       createdAt: { $gte: new Date(Date.now() - 300000) },
     });
-    if (existingSuppInv) {
+    if (existingSuppInv && (!idempotencyKey || existingSuppInv.idempotencyKey !== String(idempotencyKey).trim())) {
       return ApiResponse.success(res, { message: 'Purchase with this supplier invoice already saved', data: existingSuppInv });
     }
   }
@@ -172,6 +191,7 @@ const create = asyncHandler(async (req, res) => {
       paymentStatus: effectivePaymentStatus,
       financialYear,
       createdBy: req.user?.name,
+      idempotencyKey: idempotencyKey ? String(idempotencyKey).trim() : undefined,
     }], opts);
 
     await postSupplierEntry({ partyId: supplierId, date: purchaseDate || new Date(), type: 'Purchase', refId: purchase.id, refNo: finalPurchaseInvoiceNo, credit: totals.grandTotal, session });

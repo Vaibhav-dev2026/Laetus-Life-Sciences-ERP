@@ -46,6 +46,7 @@ const purchaseSchema = new mongoose.Schema({
   cancelReason: { type: String, default: '' },
   financialYear: { type: String, required: true },
   createdBy: { type: String, default: '' },
+  idempotencyKey: { type: String, sparse: true, index: true },
 }, { timestamps: true });
 
 purchaseSchema.index({ purchaseDate: -1 });

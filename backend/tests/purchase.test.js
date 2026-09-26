@@ -183,4 +183,51 @@ describe('Purchase transaction', () => {
     expect(batch).not.toBeNull();
     expect(batch.currentQty).toBe(110);
   });
+
+  test('request-key idempotency correctly handles retries, new transactions, and payload conflicts', async () => {
+    const key = 'IDEM-PUR-TEST-123';
+    const payload1 = {
+      purchaseInvoiceNo: 'PI-IDEM-1', purchaseDate: '2026-08-01', supplierId: 'SUPP-000001',
+      lines: [{ productId: 'PRD-000001', batchNo: 'IDEM-BATCH-1', expDate: '2028-01-01', qty: 10, rate: 50, gstRate: 12 }],
+    };
+
+    // 1. Initial request with idempotency key
+    const res1 = await request(app).post('/api/purchases')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', key)
+      .send(payload1);
+    expect(res1.status).toBe(201);
+    const createdId = res1.body.data.id;
+
+    // 2. Retry request with SAME idempotency key -> returns existing purchase without creating duplicate
+    const res2 = await request(app).post('/api/purchases')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', key)
+      .send(payload1);
+    expect(res2.status).toBe(200);
+    expect(res2.body.data.id).toBe(createdId);
+
+    // 3. Different idempotency key with SAME supplier and SAME total -> allowed as a NEW purchase
+    const payload2 = {
+      purchaseInvoiceNo: 'PI-IDEM-2', purchaseDate: '2026-08-01', supplierId: 'SUPP-000001',
+      lines: [{ productId: 'PRD-000001', batchNo: 'IDEM-BATCH-2', expDate: '2028-01-01', qty: 10, rate: 50, gstRate: 12 }],
+    };
+    const res3 = await request(app).post('/api/purchases')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', 'IDEM-PUR-TEST-456')
+      .send(payload2);
+    expect(res3.status).toBe(201);
+    expect(res3.body.data.id).not.toBe(createdId);
+
+    // 4. Same idempotency key with CONFLICTING payload -> returns 409 Conflict
+    const conflictingPayload = {
+      purchaseInvoiceNo: 'PI-IDEM-3', purchaseDate: '2026-08-01', supplierId: 'SUPP-000001',
+      lines: [{ productId: 'PRD-000001', batchNo: 'IDEM-BATCH-3', expDate: '2028-01-01', qty: 999, rate: 500, gstRate: 12 }],
+    };
+    const res4 = await request(app).post('/api/purchases')
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-idempotency-key', key)
+      .send(conflictingPayload);
+    expect(res4.status).toBe(409);
+  });
 });
