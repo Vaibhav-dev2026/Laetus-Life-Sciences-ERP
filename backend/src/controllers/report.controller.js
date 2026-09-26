@@ -7,9 +7,8 @@ const { buildDateQuery } = require('../utils/dateRange.util');
 const salesReport = asyncHandler(async (req, res) => {
   const { from, to, financialYear } = req.query;
   const dateFilter = buildDateQuery({ from, to, financialYear });
-  const query = { status: 'Active' };
+  const query = { status: { $ne: 'Cancelled' } };
   if (dateFilter) query.date = dateFilter;
-  if (financialYear) query.financialYear = financialYear;
 
   const sales = await Sale.find(query).sort({ date: -1 });
   const customers = await Customer.find({ id: { $in: sales.map((s) => s.customerId) } });
@@ -19,9 +18,9 @@ const salesReport = asyncHandler(async (req, res) => {
     invoiceNo: s.invoiceNo,
     date: s.date,
     customer: map.get(s.customerId) || s.customerId,
-    items: s.lines.length,
-    amount: s.grandTotal,
-    status: s.paymentStatus,
+    items: Array.isArray(s.lines) ? s.lines.length : 0,
+    amount: round2(s.grandTotal || 0),
+    status: s.paymentStatus || s.status || 'Active',
   }));
   return ApiResponse.success(res, { data });
 });
@@ -29,9 +28,8 @@ const salesReport = asyncHandler(async (req, res) => {
 const purchaseReport = asyncHandler(async (req, res) => {
   const { from, to, financialYear } = req.query;
   const dateFilter = buildDateQuery({ from, to, financialYear });
-  const query = { status: 'Active' };
+  const query = { status: { $ne: 'Cancelled' } };
   if (dateFilter) query.purchaseDate = dateFilter;
-  if (financialYear) query.financialYear = financialYear;
 
   const purchases = await Purchase.find(query).sort({ purchaseDate: -1 });
   const suppliers = await Supplier.find({ id: { $in: purchases.map((p) => p.supplierId) } });
@@ -41,9 +39,9 @@ const purchaseReport = asyncHandler(async (req, res) => {
     purchaseInvoiceNo: p.purchaseInvoiceNo,
     date: p.purchaseDate,
     supplier: map.get(p.supplierId) || p.supplierId,
-    items: p.lines.length,
-    amount: p.grandTotal,
-    status: p.paymentStatus,
+    items: Array.isArray(p.lines) ? p.lines.length : 0,
+    amount: round2(p.grandTotal || 0),
+    status: p.paymentStatus || p.status || 'Active',
   }));
   return ApiResponse.success(res, { data });
 });
@@ -73,7 +71,7 @@ const financialReport = asyncHandler(async (req, res) => {
   const { from, to, financialYear } = req.query;
   const dateFilter = buildDateQuery({ from, to, financialYear });
 
-  const saleMatch = { status: 'Active' };
+  const saleMatch = { status: { $ne: 'Cancelled' } };
   const paymentMatch = {};
   const expenseMatch = {};
 
@@ -81,9 +79,6 @@ const financialReport = asyncHandler(async (req, res) => {
     saleMatch.date = dateFilter;
     paymentMatch.date = dateFilter;
     expenseMatch.date = dateFilter;
-  }
-  if (financialYear) {
-    saleMatch.financialYear = financialYear;
   }
 
   const [receivableAgg] = await Sale.aggregate([{ $match: saleMatch }, { $group: { _id: null, total: { $sum: '$balance' } } }]);

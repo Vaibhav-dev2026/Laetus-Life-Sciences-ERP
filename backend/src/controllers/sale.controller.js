@@ -104,6 +104,18 @@ const create = asyncHandler(async (req, res) => {
   });
   const totals = calcDocumentTotals(computedLines);
 
+  // Idempotency check: prevent duplicate sale invoice creation from rapid double-clicks or retries
+  const fifteenSecsAgo = new Date(Date.now() - 15000);
+  const existingRecentSale = await Sale.findOne({
+    customerId,
+    grandTotal: totals.grandTotal,
+    status: { $ne: 'Cancelled' },
+    createdAt: { $gte: fifteenSecsAgo },
+  });
+  if (existingRecentSale) {
+    return ApiResponse.success(res, { message: 'Invoice already created (duplicate request suppressed)', data: existingRecentSale });
+  }
+
   const saved = await withTransaction(async (session) => {
     const opts = session ? { session } : {};
     const { invoiceNo, financialYear } = await nextInvoiceNumber({

@@ -46,7 +46,30 @@ const update = asyncHandler(async (req, res) => {
     }
   }
 
-  Object.assign(company, req.body);
+  const topLevelFields = ['name', 'logo', 'addressLine1', 'addressLine2', 'state', 'stateCode', 'pin', 'phone', 'email', 'gstin', 'pan', 'drugLicence', 'signatoryLabel', 'currentFinancialYear', 'availableFinancialYears', 'terms'];
+  topLevelFields.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      company[field] = req.body[field];
+    }
+  });
+
+  if (req.body.bank && typeof req.body.bank === 'object') {
+    if (!company.bank) company.bank = {};
+    if (req.body.bank.bankName !== undefined) company.bank.bankName = req.body.bank.bankName;
+    if (req.body.bank.accountNumber !== undefined) company.bank.accountNumber = req.body.bank.accountNumber;
+    if (req.body.bank.ifsc !== undefined) company.bank.ifsc = req.body.bank.ifsc;
+  }
+
+  if (req.body.invoice && typeof req.body.invoice === 'object') {
+    if (!company.invoice) company.invoice = {};
+    if (req.body.invoice.prefix !== undefined) company.invoice.prefix = req.body.invoice.prefix;
+    if (req.body.invoice.numberFormat !== undefined) company.invoice.numberFormat = req.body.invoice.numberFormat;
+    if (req.body.invoice.financialYearStart !== undefined) company.invoice.financialYearStart = req.body.invoice.financialYearStart;
+    if (req.body.invoice.startNumber !== undefined) company.invoice.startNumber = req.body.invoice.startNumber;
+    if (req.body.invoice.dueDateDays !== undefined) company.invoice.dueDateDays = req.body.invoice.dueDateDays;
+    if (req.body.invoice.expiryPolicy !== undefined) company.invoice.expiryPolicy = req.body.invoice.expiryPolicy;
+  }
+
   await company.save();
   await logAudit({ user: req.user?.name, action: 'Update', module: 'Company Settings', reference: 'company', before, after: company.toObject() });
   return ApiResponse.success(res, { message: 'Company settings saved', data: company });

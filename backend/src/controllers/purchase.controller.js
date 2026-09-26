@@ -82,6 +82,30 @@ const create = asyncHandler(async (req, res) => {
   });
   const totals = calcDocumentTotals(computedLines);
 
+  // Idempotency check: prevent duplicate purchase creation from rapid double-clicks or retries
+  const fifteenSecsAgo = new Date(Date.now() - 15000);
+  const existingRecent = await Purchase.findOne({
+    supplierId,
+    grandTotal: totals.grandTotal,
+    status: { $ne: 'Cancelled' },
+    createdAt: { $gte: fifteenSecsAgo },
+  });
+  if (existingRecent) {
+    return ApiResponse.success(res, { message: 'Purchase already processed (duplicate request suppressed)', data: existingRecent });
+  }
+
+  if (supplierInvoiceNo && String(supplierInvoiceNo).trim()) {
+    const existingSuppInv = await Purchase.findOne({
+      supplierId,
+      supplierInvoiceNo: String(supplierInvoiceNo).trim(),
+      status: { $ne: 'Cancelled' },
+      createdAt: { $gte: new Date(Date.now() - 300000) },
+    });
+    if (existingSuppInv) {
+      return ApiResponse.success(res, { message: 'Purchase with this supplier invoice already saved', data: existingSuppInv });
+    }
+  }
+
   // Determine effective amount paid and payment status
   let effectiveAmountPaid = 0;
   if (paymentStatus === 'Paid') {
