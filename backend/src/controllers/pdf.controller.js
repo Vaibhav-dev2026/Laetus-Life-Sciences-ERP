@@ -9,7 +9,7 @@ const {
   generateLedgerPdf,
 } = require('../services/pdf.service');
 
-function sendPdfResponse(res, filename, buffer) {
+function sendPdfResponse(res, filename, buffer, disposition = 'attachment') {
   // Defensive: verify the buffer is genuinely a PDF (starts with %PDF-)
   const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
   const isPdf = buf.length > 5 && buf.subarray(0, 5).toString('utf-8') === '%PDF-';
@@ -28,8 +28,11 @@ function sendPdfResponse(res, filename, buffer) {
   const cleanFilename = filename.replace(/\.pdf$/i, '') + '.pdf';
   res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${cleanFilename}"`);
+  res.setHeader('Content-Disposition', `${disposition}; filename="${cleanFilename}"`);
   res.setHeader('Content-Length', buf.length);
+  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   return res.status(200).end(buf);
 }
 
@@ -43,9 +46,10 @@ const downloadInvoice = asyncHandler(async (req, res) => {
   const customer = await Customer.findOne({ $or: [{ id: sale.customerId }, ...(require('mongoose').Types.ObjectId.isValid(sale.customerId) ? [{ _id: sale.customerId }] : [])] });
   const company = normalizeCompany(await Company.findOne());
 
+  const disposition = req.query.inline === 'true' || req.query.disposition === 'inline' ? 'inline' : 'attachment';
   try {
     const pdfBuffer = await generateInvoicePdf({ company, customer, sale });
-    return sendPdfResponse(res, `${(sale.invoiceNo || sale.id).replace(/\//g, '-')}.pdf`, pdfBuffer);
+    return sendPdfResponse(res, `${(sale.invoiceNo || sale.id).replace(/\//g, '-')}.pdf`, pdfBuffer, disposition);
   } catch (err) {
     throw ApiError.internal(`PDF generation failed: ${err.message}`);
   }
@@ -61,9 +65,10 @@ const downloadPurchase = asyncHandler(async (req, res) => {
   const supplier = await Supplier.findOne({ $or: [{ id: purchase.supplierId }, ...(require('mongoose').Types.ObjectId.isValid(purchase.supplierId) ? [{ _id: purchase.supplierId }] : [])] });
   const company = normalizeCompany(await Company.findOne());
 
+  const disposition = req.query.inline === 'true' || req.query.disposition === 'inline' ? 'inline' : 'attachment';
   try {
     const pdfBuffer = await generatePurchasePdf({ company, supplier, purchase });
-    return sendPdfResponse(res, `${(purchase.purchaseInvoiceNo || purchase.id).replace(/\//g, '-')}.pdf`, pdfBuffer);
+    return sendPdfResponse(res, `${(purchase.purchaseInvoiceNo || purchase.id).replace(/\//g, '-')}.pdf`, pdfBuffer, disposition);
   } catch (err) {
     throw ApiError.internal(`PDF generation failed: ${err.message}`);
   }
@@ -85,9 +90,10 @@ const downloadPayment = asyncHandler(async (req, res) => {
   }
   const company = normalizeCompany(await Company.findOne());
 
+  const disposition = req.query.inline === 'true' || req.query.disposition === 'inline' ? 'inline' : 'attachment';
   try {
     const pdfBuffer = await generatePaymentPdf({ company, party, payment });
-    return sendPdfResponse(res, `Receipt-${payment.id}.pdf`, pdfBuffer);
+    return sendPdfResponse(res, `Receipt-${payment.id}.pdf`, pdfBuffer, disposition);
   } catch (err) {
     throw ApiError.internal(`PDF generation failed: ${err.message}`);
   }
@@ -112,6 +118,7 @@ const downloadCustomerLedger = asyncHandler(async (req, res) => {
   const company = normalizeCompany(await Company.findOne());
   const dateRange = (from && to) ? `${from} to ${to}` : 'All Time';
 
+  const disposition = req.query.inline === 'true' || req.query.disposition === 'inline' ? 'inline' : 'attachment';
   try {
     const pdfBuffer = await generateLedgerPdf({
       company,
@@ -122,7 +129,7 @@ const downloadCustomerLedger = asyncHandler(async (req, res) => {
       closingBalance,
       dateRange,
     });
-    return sendPdfResponse(res, `Ledger-${(customer.partyName || customerId).replace(/\s+/g, '_')}.pdf`, pdfBuffer);
+    return sendPdfResponse(res, `Ledger-${(customer.partyName || customerId).replace(/\s+/g, '_')}.pdf`, pdfBuffer, disposition);
   } catch (err) {
     throw ApiError.internal(`PDF generation failed: ${err.message}`);
   }
@@ -147,6 +154,7 @@ const downloadSupplierLedger = asyncHandler(async (req, res) => {
   const company = normalizeCompany(await Company.findOne());
   const dateRange = (from && to) ? `${from} to ${to}` : 'All Time';
 
+  const disposition = req.query.inline === 'true' || req.query.disposition === 'inline' ? 'inline' : 'attachment';
   try {
     const pdfBuffer = await generateLedgerPdf({
       company,
@@ -157,7 +165,7 @@ const downloadSupplierLedger = asyncHandler(async (req, res) => {
       closingBalance,
       dateRange,
     });
-    return sendPdfResponse(res, `Ledger-${(supplier.partyName || supplierId).replace(/\s+/g, '_')}.pdf`, pdfBuffer);
+    return sendPdfResponse(res, `Ledger-${(supplier.partyName || supplierId).replace(/\s+/g, '_')}.pdf`, pdfBuffer, disposition);
   } catch (err) {
     throw ApiError.internal(`PDF generation failed: ${err.message}`);
   }

@@ -50,7 +50,7 @@ export default function PdfPreviewModal({ open, url, title = 'PDF Preview', file
 
         const response = await axiosClient.get(targetUrl, {
           responseType: 'blob',
-          params,
+          params: { ...params, inline: 'true' },
           timeout: 60000,
         });
 
@@ -116,6 +116,12 @@ export default function PdfPreviewModal({ open, url, title = 'PDF Preview', file
     }
   }
 
+  function handleOpenInTab() {
+    if (blobUrl) {
+      window.open(blobUrl, '_blank');
+    }
+  }
+
   function handlePrint() {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       try {
@@ -141,10 +147,6 @@ export default function PdfPreviewModal({ open, url, title = 'PDF Preview', file
           }
         };
         win.addEventListener('load', doPrint);
-        // Safety net: some browsers' built-in PDF viewer never fires a
-        // reliable 'load' event on the popup window, which previously
-        // caused window.print() to fire before the document was ready and
-        // print only a partial page.
         setTimeout(doPrint, 800);
         return;
       }
@@ -165,6 +167,16 @@ export default function PdfPreviewModal({ open, url, title = 'PDF Preview', file
         >
           {downloading ? 'Downloading…' : '📥 Download PDF'}
         </button>
+        {blobUrl && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={handleOpenInTab}
+            title="Open PDF in a new browser tab"
+          >
+            ↗️ Open in Tab
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-secondary btn-sm"
@@ -196,23 +208,41 @@ export default function PdfPreviewModal({ open, url, title = 'PDF Preview', file
             <h4 style={{ margin: '0 0 8px 0', color: 'var(--color-danger)' }}>Unable to preview PDF</h4>
             <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>{error}</p>
             <div className="flex-gap-2" style={{ justifyContent: 'center' }}>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={handleDownload}>
-                Try Direct Download
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleDownload}>
+                📥 Download PDF Directly
               </button>
             </div>
           </div>
         )}
 
         {blobUrl && !loading && !error && (
-          <div style={{ width: '100%', height: '70vh', background: '#333', borderRadius: '6px', overflow: 'hidden' }}>
-            <iframe
-              ref={iframeRef}
-              src={blobUrl}
-              title={title}
+          <div style={{ width: '100%', height: '70vh', background: '#333', borderRadius: '6px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <object
+              data={blobUrl}
+              type="application/pdf"
               width="100%"
               height="100%"
-              style={{ border: 'none', background: '#ffffff' }}
-            />
+              style={{ border: 'none', background: '#ffffff', flex: 1 }}
+            >
+              <iframe
+                ref={iframeRef}
+                src={blobUrl}
+                title={title}
+                width="100%"
+                height="100%"
+                style={{ border: 'none', background: '#ffffff' }}
+              >
+                <div style={{ padding: '24px', textAlign: 'center', color: '#fff' }}>
+                  <p>Your browser blocked inline PDF display. Use the direct buttons below to view or save:</p>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleDownload} style={{ margin: '0 8px' }}>
+                    📥 Download PDF
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleOpenInTab}>
+                    ↗️ Open in New Tab
+                  </button>
+                </div>
+              </iframe>
+            </object>
           </div>
         )}
       </div>

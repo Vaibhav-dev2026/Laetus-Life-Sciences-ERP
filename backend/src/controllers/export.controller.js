@@ -41,9 +41,13 @@ const exportReport = asyncHandler(async (req, res) => {
       const mimeType = isPdf ? 'application/pdf' : 'text/html; charset=utf-8';
       const ext = isPdf ? '.pdf' : '.html';
 
+      const disposition = req.query.inline === 'true' || req.query.disposition === 'inline' ? 'inline' : 'attachment';
       res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', `attachment; filename="${report}${ext}"`);
+      res.setHeader('Content-Disposition', `${disposition}; filename="${report}${ext}"`);
       res.setHeader('Content-Length', pdfBuffer.length);
+      res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       return res.status(200).end(pdfBuffer);
     } catch (err) {
       throw ApiError.internal(`PDF generation failed: ${err.message}`);
