@@ -11,7 +11,17 @@ export function CompanyProvider({ children }) {
     try {
       const data = await getCompany();
       if (data && typeof data === 'object' && data.name) {
-        setCompanyState((prev) => ({ ...prev, ...data }));
+        // Deep merge: preserve nested bank/invoice objects correctly
+        setCompanyState((prev) => ({
+          ...prev,
+          ...data,
+          bank: { ...(prev.bank || {}), ...(data.bank || {}) },
+          invoice: { ...(prev.invoice || {}), ...(data.invoice || {}) },
+          terms: Array.isArray(data.terms) ? data.terms : (prev.terms || []),
+          availableFinancialYears: Array.isArray(data.availableFinancialYears) && data.availableFinancialYears.length
+            ? data.availableFinancialYears
+            : prev.availableFinancialYears,
+        }));
       }
     } catch (_) {
       /* fallback to COMPANY_CONFIG */
@@ -23,7 +33,17 @@ export function CompanyProvider({ children }) {
   }, []);
 
   const updateCompanyInContext = (data) => {
-    setCompanyState((prev) => ({ ...prev, ...data }));
+    if (!data) return;
+    setCompanyState((prev) => ({
+      ...prev,
+      ...data,
+      bank: { ...(prev.bank || {}), ...(data.bank || {}) },
+      invoice: { ...(prev.invoice || {}), ...(data.invoice || {}) },
+      terms: Array.isArray(data.terms) ? data.terms : (prev.terms || []),
+      availableFinancialYears: Array.isArray(data.availableFinancialYears) && data.availableFinancialYears.length
+        ? data.availableFinancialYears
+        : prev.availableFinancialYears,
+    }));
   };
 
   return (
@@ -40,4 +60,3 @@ export function useCompany() {
   }
   return ctx;
 }
-

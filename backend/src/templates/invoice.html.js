@@ -17,6 +17,16 @@ function renderInvoiceHtml({ company, customer, sale }) {
   const sameState = !s.isInterState;
   const lines = s.lines || [];
 
+  // Terms: use saved company terms, fall back to standard pharmaceutical terms
+  const terms = Array.isArray(comp.terms) && comp.terms.length > 0
+    ? comp.terms
+    : [
+        'Goods once sold will not be taken back or exchanged.',
+        'Bills not paid due date will attract 24% interest.',
+        'All disputes subject to Surat jurisdiction only.',
+        'Prescribed Sales Tax declaration will be given.',
+      ];
+
   const standardRates = [5, 12, 18, 28];
   const gstSummary = standardRates.map((rate) => {
     const matching = lines.filter((l) => Math.abs(Number(l.gstRate || 0) - rate) < 0.1);
@@ -38,7 +48,7 @@ function renderInvoiceHtml({ company, customer, sale }) {
   const rows = lines.map((l, i) => {
     const halfGstRate = Number(l.gstRate || 0) / 2;
     return `
-    <tr>
+    <tr class="${i % 2 === 1 ? 'row-alt' : ''}">
       <td style="text-align:center;">${i + 1}</td>
       <td style="text-align:left;font-weight:bold;">${escapeHtml(l.productName || l.productId)}</td>
       <td style="text-align:center;">${escapeHtml(l.pack || '-')}</td>
@@ -68,56 +78,114 @@ function renderInvoiceHtml({ company, customer, sale }) {
       <td style="text-align:right;">${sum.total.toFixed(2)}</td>
     </tr>`).join('');
 
+  // Drug licence: only show when a real value is saved — never emit a XXXX placeholder
+  const drugLicenceLine = comp.drugLicence && comp.drugLicence.trim()
+    ? `<strong>D.L. No.:</strong> ${escapeHtml(comp.drugLicence)}<br/>`
+    : '';
+
+  // Bank details: use saved values, show nothing if empty (not fake placeholders)
+  const bankName = (comp.bank && comp.bank.bankName) ? comp.bank.bankName : '';
+  const bankAcct = (comp.bank && comp.bank.accountNumber) ? comp.bank.accountNumber : '';
+  const bankIfsc = (comp.bank && comp.bank.ifsc) ? comp.bank.ifsc : '';
+  const bankBlock = bankName
+    ? `<strong>${escapeHtml(bankName.toUpperCase())}</strong><br/>
+       ${bankAcct ? `A/C NO: ${escapeHtml(bankAcct)}<br/>` : ''}
+       ${bankIfsc ? `IFSC CODE: ${escapeHtml(bankIfsc)}` : ''}`
+    : '<em style="color:#888;">Bank details not configured</em>';
+
+  // Terms block from saved company data
+  const termsHtml = terms.map((t, i) => `${i + 1}. ${escapeHtml(t)}`).join('<br/>');
+
   return `<!doctype html>
 <html><head><meta charset="utf-8" />
 <title>Invoice ${escapeHtml(s.invoiceNo || s.id || '')}</title>
 <style>
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 portrait; margin: 8mm; }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 10px; color: #111; margin: 0; padding: 0; }
-  .doc-wrap { width: 100%; border: 1.5px solid #222; }
-  .header-grid { display: flex; border-bottom: 2px solid #222; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 10px; color: #1a1a1a; margin: 0; padding: 0; background: #fff; }
+
+  /* ── Outer wrapper ── */
+  .doc-wrap { width: 100%; border: 1.5px solid #2c2c2c; }
+
+  /* ── Header: company left / customer right ── */
+  .header-grid { display: flex; border-bottom: 2px solid #2c2c2c; }
   .header-box { flex: 1; padding: 8px 10px; }
-  .header-box.left { border-right: 1.5px solid #222; }
-  .comp-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .logo-badge { width: 26px; height: 26px; background: #0284c7; color: #fff; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; }
-  .comp-title { font-size: 13px; font-weight: bold; color: #000; }
-  .cust-title { font-size: 12px; font-weight: bold; color: #000; margin-bottom: 4px; }
-  .meta-text { font-size: 9.5px; line-height: 1.35; color: #222; }
-  .title-bar { text-align: center; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; padding: 3px 0; border-bottom: 1.5px solid #222; background: #fdfdfd; }
-  .info-bar { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 10px; background: #fafafa; border-bottom: 1.5px solid #222; }
+  .header-box.left { border-right: 1.5px solid #2c2c2c; }
+  .comp-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid #d4a84b33; }
+  .logo-badge { width: 28px; height: 28px; background: linear-gradient(135deg, #c8963c, #e8c06a); color: #1a1a1a; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; flex-shrink: 0; }
+  .comp-title { font-size: 13px; font-weight: 800; color: #111; letter-spacing: 0.02em; }
+  .cust-title { font-size: 12px; font-weight: 700; color: #111; margin-bottom: 4px; }
+  .meta-text { font-size: 9.5px; line-height: 1.5; color: #2a2a2a; }
+
+  /* ── GST Invoice title strip ── */
+  .title-bar {
+    text-align: center; font-size: 12px; font-weight: 800; letter-spacing: 2px;
+    padding: 4px 0; border-bottom: 1.5px solid #2c2c2c;
+    background: linear-gradient(90deg, #f5edd8 0%, #fdf8ee 40%, #f5edd8 100%);
+    color: #7a5c1e;
+  }
+
+  /* ── Invoice info bar ── */
+  .info-bar {
+    display: flex; justify-content: space-between; padding: 4px 10px;
+    font-size: 10px; background: #fafafa; border-bottom: 1.5px solid #2c2c2c;
+  }
+
+  /* ── Line items table ── */
   table.items-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
-  table.items-table th, table.items-table td { border: 1px solid #222; padding: 3px 4px; }
-  table.items-table th { background: #f0f0f0; font-weight: bold; text-align: center; font-size: 9.5px; }
-  .bottom-grid { display: flex; border-top: 1.5px solid #222; }
-  .bottom-col { flex: 1; padding: 6px 8px; border-right: 1px solid #222; font-size: 9.5px; }
+  table.items-table th, table.items-table td { border: 1px solid #c0c0c0; padding: 3px 4px; }
+  table.items-table th {
+    background: linear-gradient(180deg, #2c2c2c 0%, #1a1a1a 100%);
+    color: #f0d98a;
+    font-weight: 700; text-align: center; font-size: 9.5px; letter-spacing: 0.03em;
+  }
+  table.items-table tr.row-alt td { background: #f9f6ef; }
+
+  /* ── Bottom 3-column grid ── */
+  .bottom-grid { display: flex; border-top: 1.5px solid #2c2c2c; }
+  .bottom-col { flex: 1; padding: 6px 8px; border-right: 1px solid #c0c0c0; font-size: 9.5px; }
   .bottom-col:last-child { border-right: none; flex: 1.1; }
-  .box-head { font-size: 9.5px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 2px; margin-bottom: 3px; }
+  .box-head {
+    font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+    color: #7a5c1e; border-bottom: 1px solid #d4a84b55; padding-bottom: 2px; margin-bottom: 4px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── GST summary table ── */
   table.gst-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 3px; }
-  table.gst-table th, table.gst-table td { border: 1px solid #444; padding: 2px 4px; }
-  table.gst-table th { background: #eaeaea; text-align: center; }
-  .tot-line { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted #ccc; font-size: 10px; }
-  .grand-line { font-weight: bold; font-size: 11.5px; border-top: 1.5px solid #222; border-bottom: none; padding-top: 4px; margin-top: 2px; }
-  .sig-strip { display: flex; justify-content: space-between; border-top: 1.5px solid #222; padding: 18px 16px 8px; font-size: 9.5px; }
+  table.gst-table th, table.gst-table td { border: 1px solid #c0c0c0; padding: 2px 4px; }
+  table.gst-table th { background: #f5edd8; text-align: center; font-weight: 700; color: #5a3e10; }
+
+  /* ── Totals column ── */
+  .tot-line { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted #d0d0d0; font-size: 10px; }
+  .grand-line {
+    font-weight: 800; font-size: 12px; color: #fff;
+    background: linear-gradient(90deg, #2c2c2c, #1a1a1a);
+    padding: 4px 6px; margin: 4px -8px -6px;
+    border-top: none; border-bottom: none;
+    display: flex; justify-content: space-between;
+  }
+
+  /* ── Signature strip ── */
+  .sig-strip { display: flex; justify-content: space-between; border-top: 1.5px solid #2c2c2c; padding: 18px 16px 8px; font-size: 9.5px; }
   .sig-box { width: 180px; text-align: center; }
-  .sig-line { border-bottom: 1px solid #222; height: 20px; margin-bottom: 4px; }
+  .sig-line { border-bottom: 1px solid #555; height: 22px; margin-bottom: 4px; }
 </style></head>
 <body>
   <div class="doc-wrap">
     <div class="header-grid">
       <div class="header-box left">
         <div class="comp-brand">
-          ${comp.logo ? `<img src="${comp.logo}" style="max-height:32px;max-width:90px;object-fit:contain;" />` : `<div class="logo-badge">${escapeHtml(comp.name ? comp.name.split(' ').map(w => w[0]).join('').slice(0, 3) : 'LLS')}</div>`}
+          ${comp.logo ? `<img src="${comp.logo}" style="max-height:30px;max-width:80px;object-fit:contain;" />` : `<div class="logo-badge">${escapeHtml(comp.name ? comp.name.split(' ').map(w => w[0]).join('').slice(0, 3) : 'LLS')}</div>`}
           <div class="comp-title">${escapeHtml(comp.name || 'L LAETUS LIFE SCIENCES')}</div>
         </div>
-
         <div class="meta-text">
-          ${escapeHtml(comp.addressLine1 || '1st Floor, 249 Sukhinagar 24-GUJARAT')}<br/>
-          ${escapeHtml(comp.addressLine2 || 'Bamroli Gam Road, Pandesara, Surat-394221')}<br/>
-          <strong>Phone:</strong> ${escapeHtml(comp.phone || '9662031042')}<br/>
-          <strong>D.L. No.:</strong> ${escapeHtml(comp.drugLicence || 'GJ-SUR-20-244992/21-244993')}<br/>
-          <strong>E-Mail:</strong> ${escapeHtml(comp.email || 'LAETUSLIFESCIENCES@GMAIL.COM')}<br/>
-          <strong>GSTIN:</strong> ${escapeHtml(comp.gstin || '24AFSPT7471H1ZR')}
+          ${escapeHtml(comp.addressLine1 || '')}<br/>
+          ${escapeHtml(comp.addressLine2 || '')}<br/>
+          <strong>Phone:</strong> ${escapeHtml(comp.phone || '')}<br/>
+          ${drugLicenceLine}
+          <strong>E-Mail:</strong> ${escapeHtml(comp.email || '')}<br/>
+          <strong>GSTIN:</strong> ${escapeHtml(comp.gstin || '')}
         </div>
       </div>
       <div class="header-box">
@@ -131,7 +199,7 @@ function renderInvoiceHtml({ company, customer, sale }) {
       </div>
     </div>
 
-    <div class="title-bar">TAX INVOICE</div>
+    <div class="title-bar">GST INVOICE</div>
 
     <div class="info-bar">
       <div><strong>Sales Man:</strong> ${escapeHtml(s.salesman || '-')}</div>
@@ -164,19 +232,14 @@ function renderInvoiceHtml({ company, customer, sale }) {
       <div class="bottom-col">
         <div class="box-head">BANK DETAILS:</div>
         <div class="meta-text">
-          <strong>${escapeHtml(comp.bank?.bankName || 'HDFC BANK LTD')}</strong><br/>
-          A/C NO: ${escapeHtml(comp.bank?.accountNumber || '00000000000000')}<br/>
-          IFSC CODE: ${escapeHtml(comp.bank?.ifsc || 'HDFC0000000')}
+          ${bankBlock}
         </div>
-        <div class="meta-text" style="margin-top:4px;border-top:1px dashed #666;padding-top:2px;">
+        <div class="meta-text" style="margin-top:5px;border-top:1px dashed #c8a848;padding-top:3px;">
           <strong>LEDGER BALANCE:</strong> Rs. ${Number(cust.currentBalance || 0).toFixed(2)}
         </div>
-        <div class="box-head" style="margin-top:6px;">Terms &amp; Conditions</div>
-        <div class="meta-text" style="font-size:8.5px;line-height:1.3;">
-          1. Goods once sold will not be taken back or exchanged.<br/>
-          2. Bills not paid due date will attract 24% interest.<br/>
-          3. All disputes subject to Surat jurisdiction only.<br/>
-          4. Prescribed Sales Tax declaration will be given.
+        <div class="box-head" style="margin-top:7px;">Terms &amp; Conditions</div>
+        <div class="meta-text" style="font-size:8.5px;line-height:1.4;">
+          ${termsHtml}
         </div>
       </div>
 
@@ -201,7 +264,7 @@ function renderInvoiceHtml({ company, customer, sale }) {
           : `<div class="tot-line"><span>IGST PAYABLE</span><span>${formatCurrency(s.igstTotal || 0)}</span></div>`}
         ${s.courierCharge ? `<div class="tot-line"><span>COURIER / OTHER</span><span>${formatCurrency(s.courierCharge)}</span></div>` : ''}
         <div class="tot-line grand-line"><span>GRAND TOTAL</span><span>${formatCurrency(s.grandTotal || 0)}</span></div>
-        <div class="meta-text" style="margin-top:6px;border-top:1px solid #444;padding-top:2px;">
+        <div class="meta-text" style="margin-top:8px;border-top:1px solid #c8a848;padding-top:2px;">
           <strong>Amount in Words:</strong> Rupees ${Number(s.grandTotal || 0).toFixed(2)} Only
         </div>
       </div>
@@ -213,7 +276,7 @@ function renderInvoiceHtml({ company, customer, sale }) {
         <div>Receiver Signature &amp; Stamp</div>
       </div>
       <div class="sig-box">
-        <div style="font-weight:bold;margin-bottom:8px;">${escapeHtml(comp.signatoryLabel || 'For L LAETUS LIFE SCIENCES')}</div>
+        <div style="font-weight:bold;margin-bottom:8px;">${escapeHtml(comp.signatoryLabel || 'for L LAETUS LIFE SCIENCES')}</div>
         <div class="sig-line"></div>
         <div>Authorized Signatory</div>
       </div>

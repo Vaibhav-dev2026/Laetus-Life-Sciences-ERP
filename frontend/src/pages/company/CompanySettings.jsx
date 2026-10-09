@@ -13,7 +13,7 @@ const TABS = ['Company Profile', 'Invoice Settings', 'Financial Years', 'Bank De
 export default function CompanySettings() {
   usePageTitle('Company Settings');
   const toast = useToast();
-  const { company, setCompany } = useCompany();
+  const { company, setCompany, reloadCompany } = useCompany();
   const [tab, setTab] = useState('Company Profile');
   const [newFyInput, setNewFyInput] = useState('');
   const [form, setForm] = useState({
@@ -80,7 +80,21 @@ export default function CompanySettings() {
     e.preventDefault();
     try {
       const updated = await updateCompany(form);
-      setCompany(updated || form);
+      // Pull the server-confirmed record into context so all documents use the real saved data
+      if (updated && typeof updated === 'object') {
+        setCompany(updated);
+        // Also update local form state from server response to keep UI in sync
+        setForm((prev) => ({
+          ...prev,
+          ...updated,
+          bank: { ...(prev.bank || {}), ...(updated.bank || {}) },
+          invoice: { ...(prev.invoice || {}), ...(updated.invoice || {}) },
+          terms: Array.isArray(updated.terms) ? updated.terms : prev.terms,
+        }));
+      } else {
+        // Fallback: reload from server
+        await reloadCompany();
+      }
       toast.success('Company settings saved successfully.');
     } catch (err) {
       toast.error(err.message || 'Failed to save company settings.');

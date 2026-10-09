@@ -10,30 +10,30 @@
 .invoice-totals .row.grand { border-top: 2px solid var(--color-border-strong); margin-top: 6px; padding-top: 10px; font-size: var(--font-size-lg); font-weight: var(--font-weight-bold); }
 .invoice-actions-bar { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; }
 
-/* Pharma A4 GST Invoice Document */
+/* Pharma A4 GST Invoice Document with Refined Professional Gold/Charcoal Aesthetic */
 .invoice-preview-doc {
   background: #ffffff;
   padding: 16px;
   font-size: 11px;
-  color: #111111;
+  color: #1a1a1a;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  border: 1px solid #333333;
+  border: 1.5px solid #2c2c2c;
   margin: 0 auto;
 }
 
 .inv-header-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border: 1px solid #222222;
-  border-bottom: 2px solid #222222;
+  border: 1px solid #2c2c2c;
+  border-bottom: 2px solid #2c2c2c;
 }
 
 .inv-header-box {
-  padding: 8px 10px;
+  padding: 8px 12px;
 }
 
 .inv-header-box.company-side {
-  border-right: 1px solid #222222;
+  border-right: 1.5px solid #2c2c2c;
 }
 
 .company-branding {
@@ -41,13 +41,15 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(212, 168, 79, 0.25);
 }
 
 .company-logo-badge {
   width: 28px;
   height: 28px;
-  background: #0284c7;
-  color: #ffffff;
+  background: linear-gradient(135deg, #c8963c, #e8c06a);
+  color: #1a1a1a;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -62,43 +64,44 @@
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.03em;
-  color: #000000;
+  color: #111111;
 }
-
 
 .customer-title {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   margin-bottom: 4px;
-  color: #000000;
+  color: #111111;
 }
 
 .company-info, .customer-info {
   font-size: 10px;
-  line-height: 1.4;
-  color: #222222;
+  line-height: 1.45;
+  color: #2a2a2a;
 }
 
 .inv-title-bar {
-  border-left: 1px solid #222222;
-  border-right: 1px solid #222222;
-  border-bottom: 1px solid #222222;
+  border-left: 1px solid #2c2c2c;
+  border-right: 1px solid #2c2c2c;
+  border-bottom: 1.5px solid #2c2c2c;
   background: #fdfdfd;
 }
 
 .inv-title-text {
   text-align: center;
   font-weight: 800;
-  font-size: 13px;
-  letter-spacing: 1.5px;
-  padding: 4px 0 2px;
-  border-bottom: 1px solid #333333;
+  font-size: 12px;
+  letter-spacing: 2px;
+  padding: 4px 0 3px;
+  border-bottom: 1px solid #2c2c2c;
+  background: linear-gradient(90deg, #f5edd8 0%, #fdf8ee 40%, #f5edd8 100%);
+  color: #7a5c1e;
 }
 
 .inv-meta-grid {
   display: grid;
   grid-template-columns: 1.2fr 1.2fr 1fr 1fr;
-  padding: 4px 8px;
+  padding: 5px 10px;
   font-size: 10.5px;
   background: #fafafa;
 }
@@ -106,35 +109,42 @@
 table.invoice-table {
   width: 100%;
   border-collapse: collapse;
-  border-left: 1px solid #222222;
-  border-right: 1px solid #222222;
-  border-bottom: 1px solid #222222;
+  border-left: 1px solid #2c2c2c;
+  border-right: 1px solid #2c2c2c;
+  border-bottom: 1.5px solid #2c2c2c;
   font-size: 10px;
 }
 
 table.invoice-table th, table.invoice-table td {
-  border: 1px solid #222222;
+  border: 1px solid #c0c0c0;
   padding: 4px 4px;
-  color: #111111;
+  color: #1a1a1a;
 }
 
 table.invoice-table th {
-  background: #f2f2f2;
+  background: linear-gradient(180deg, #2c2c2c 0%, #1a1a1a 100%);
+  color: #f0d98a;
   font-weight: 700;
   text-align: center;
-  font-size: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+}
+
+table.invoice-table tbody tr:nth-child(even) td {
+  background: #fbf9f4;
 }
 
 .empty-row td {
   height: 16px;
+  background: transparent !important;
 }
 
 .inv-bottom-section {
   display: grid;
   grid-template-columns: 1.1fr 1fr 1.1fr;
-  border-left: 1px solid #222222;
-  border-right: 1px solid #222222;
-  border-bottom: 1px solid #222222;
+  border-left: 1.5px solid #2c2c2c;
+  border-right: 1.5px solid #2c2c2c;
+  border-bottom: 1.5px solid #2c2c2c;
 }
 
 .inv-bottom-col {
@@ -142,23 +152,25 @@ table.invoice-table th {
 }
 
 .inv-bottom-col.left-col {
-  border-right: 1px solid #222222;
+  border-right: 1px solid #c0c0c0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
 
 .inv-bottom-col.mid-col {
-  border-right: 1px solid #222222;
+  border-right: 1px solid #c0c0c0;
 }
 
 .box-heading {
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 9.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  margin-bottom: 3px;
-  border-bottom: 1px solid #444444;
+  color: #7a5c1e;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(212, 168, 79, 0.4);
   padding-bottom: 2px;
+  letter-spacing: 0.04em;
 }
 
 .bank-details-content {
@@ -167,10 +179,10 @@ table.invoice-table th {
 }
 
 .ledger-balance-row {
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 10px;
-  border-top: 1px dashed #666;
-  padding-top: 2px;
+  border-top: 1px dashed #c8a848;
+  padding-top: 3px;
 }
 
 .terms-box {
@@ -185,15 +197,6 @@ table.invoice-table th {
   margin: 2px 0 0 0;
 }
 
-.scan-pay-strip {
-  margin-top: 6px;
-  font-size: 9px;
-  background: #f4f4f4;
-  padding: 2px 4px;
-  border: 1px solid #ccc;
-  text-align: center;
-}
-
 .gst-summary-table {
   width: 100%;
   border-collapse: collapse;
@@ -202,14 +205,16 @@ table.invoice-table th {
 }
 
 .gst-summary-table th, .gst-summary-table td {
-  border: 1px solid #444444;
+  border: 1px solid #c0c0c0;
   padding: 2px 4px;
   text-align: right;
 }
 
 .gst-summary-table th {
-  background: #eaeaea;
+  background: #f5edd8;
+  color: #5a3e10;
   text-align: center;
+  font-weight: 700;
   font-size: 9px;
 }
 
@@ -221,7 +226,7 @@ table.invoice-table th {
   display: flex;
   justify-content: space-between;
   padding: 2px 0;
-  border-bottom: 1px dotted #ccc;
+  border-bottom: 1px dotted #d0d0d0;
 }
 
 .total-val {
@@ -232,21 +237,25 @@ table.invoice-table th {
 .grand-total-line {
   font-weight: 800;
   font-size: 12px;
-  border-top: 1.5px solid #222222;
+  color: #ffffff;
+  background: linear-gradient(90deg, #2c2c2c, #1a1a1a);
+  border-top: none;
   border-bottom: none;
-  padding-top: 4px;
-  margin-top: 2px;
+  padding: 4px 6px;
+  margin: 4px -8px -6px;
+  display: flex;
+  justify-content: space-between;
 }
 
 .total-val-grand {
   font-weight: 800;
-  color: #000000;
+  color: #ffffff;
 }
 
 .amount-words-strip {
   margin-top: 8px;
   font-size: 9.5px;
-  border-top: 1px solid #444;
+  border-top: 1px solid #c8a848;
   padding-top: 4px;
   line-height: 1.3;
 }
@@ -254,9 +263,9 @@ table.invoice-table th {
 .inv-signature-strip {
   display: flex;
   justify-content: space-between;
-  border-left: 1px solid #222222;
-  border-right: 1px solid #222222;
-  border-bottom: 1px solid #222222;
+  border-left: 1.5px solid #2c2c2c;
+  border-right: 1.5px solid #2c2c2c;
+  border-bottom: 1.5px solid #2c2c2c;
   padding: 20px 16px 8px;
   font-size: 10px;
 }
@@ -267,7 +276,7 @@ table.invoice-table th {
 }
 
 .sig-line {
-  border-bottom: 1px solid #222222;
+  border-bottom: 1px solid #555555;
   margin-bottom: 4px;
   height: 24px;
 }

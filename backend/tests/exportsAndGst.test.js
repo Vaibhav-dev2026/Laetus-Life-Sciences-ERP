@@ -503,30 +503,49 @@ describe('Exports, GSTR-1 and ITC Reconciliation', () => {
   describe('CHUNK 11 — Company Settings End-to-End', () => {
     test('Update company details -> Create invoice -> Verify updated company details in invoice & PDF', async () => {
       jest.setTimeout(60000);
-      // 1. Update company settings
+      const { renderInvoiceHtml } = require('../src/templates/invoice.html');
+
+      // 1. Update company settings with bank details, drug licence, and leading zeros in account number
       const updateCompRes = await request(app).put('/api/company').set('Authorization', `Bearer ${token}`).send({
         name: 'APEX PHARMA LABS PRIVATE LIMITED',
         addressLine1: 'Plot 55, GIDC Industrial Estate',
         addressLine2: 'Surat - 395003, Gujarat',
         phone: '+91 98989 12345',
         gstin: '24APEXX1234F1Z9',
-        drugLicence: 'GJ-SUR-20-88888 / 21-88889',
+        drugLicence: 'GJ-SUR-20-244992/21-244993',
         bank: {
-          bankName: 'Axis Bank Ltd',
-          accountNumber: '91100011223344',
-          ifsc: 'UTIB0000123',
+          bankName: 'HDFC BANK LTD',
+          accountNumber: '0050200087727422',
+          ifsc: 'HDFC0000955',
         },
         signatoryLabel: 'for APEX PHARMA LABS PRIVATE LIMITED',
       });
       expect(updateCompRes.status).toBe(200);
 
-      // 2. Fetch updated company
+      // 2. Fetch updated company and verify persistence including bank and drug licence verbatim
       const getCompRes = await request(app).get('/api/company').set('Authorization', `Bearer ${token}`);
       expect(getCompRes.status).toBe(200);
       expect(getCompRes.body.data.name).toBe('APEX PHARMA LABS PRIVATE LIMITED');
       expect(getCompRes.body.data.gstin).toBe('24APEXX1234F1Z9');
+      expect(getCompRes.body.data.drugLicence).toBe('GJ-SUR-20-244992/21-244993');
+      expect(getCompRes.body.data.bank.bankName).toBe('HDFC BANK LTD');
+      expect(getCompRes.body.data.bank.accountNumber).toBe('0050200087727422');
+      expect(getCompRes.body.data.bank.ifsc).toBe('HDFC0000955');
 
-      // 3. Create invoice and download PDF
+      // 3. Verify HTML template rendering directly to ensure no XXXX masking and full bank details
+      const htmlOutput = renderInvoiceHtml({
+        company: getCompRes.body.data,
+        customer: { partyName: 'DEVAM MEDICAL & GENERAL STORE', currentBalance: 1869 },
+        sale: { invoiceNo: 'A000020', date: new Date(), lines: [] },
+      });
+      expect(htmlOutput).toContain('GJ-SUR-20-244992/21-244993');
+      expect(htmlOutput).not.toContain('XXXX');
+      expect(htmlOutput).toContain('HDFC BANK LTD');
+      expect(htmlOutput).toContain('0050200087727422');
+      expect(htmlOutput).toContain('HDFC0000955');
+      expect(htmlOutput).toContain('GST INVOICE');
+
+      // 4. Create invoice and download PDF
       const saleRes = await request(app).post('/api/sales').set('Authorization', `Bearer ${token}`).send({
         customerId: 'CUST-000001',
         date: '2026-08-24',

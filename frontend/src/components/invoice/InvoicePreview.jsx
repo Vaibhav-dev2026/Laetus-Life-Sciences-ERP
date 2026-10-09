@@ -1,5 +1,4 @@
 import React from 'react';
-import { COMPANY_CONFIG } from '../../config/company.js';
 import { useCompany } from '../../context/CompanyContext.jsx';
 import { calcLine } from '../../utils/gst.js';
 import { formatCurrency, formatDate, amountInWords } from '../../utils/format.js';
@@ -8,9 +7,16 @@ import './invoice.css';
 // Reusable, print-ready GST invoice document aligned with pharmaceutical distribution format.
 export default function InvoicePreview({ invoice, customer }) {
   const { company: contextCompany } = useCompany();
-  const company = contextCompany || COMPANY_CONFIG;
-  const bank = company.bank || COMPANY_CONFIG.bank;
-  const terms = Array.isArray(company.terms) && company.terms.length ? company.terms : COMPANY_CONFIG.terms;
+  // Always use the live company from context — never fall back to the static COMPANY_CONFIG
+  // for business fields that the user can update via Company Settings.
+  const company = contextCompany || {};
+  const bank = company.bank || {};
+  const terms = Array.isArray(company.terms) && company.terms.length ? company.terms : [
+    'Goods once sold will not be taken back or exchanged.',
+    'Bills not paid due date will attract 24% interest.',
+    'All disputes subject to Surat jurisdiction only.',
+    'Prescribed Sales Tax declaration will be given.',
+  ];
 
   const sameState = (customer?.stateCode || company.stateCode) === company.stateCode;
   const computed = (invoice.lines || []).map((l) => ({ ...l, ...calcLine({ ...l, sameState }) }));
@@ -56,18 +62,20 @@ export default function InvoicePreview({ invoice, customer }) {
                 <span className="logo-text">{logoText}</span>
               </div>
             )}
-            <div className="company-title">{company.name}</div>
+            <div className="company-title">{company.name || 'L LAETUS LIFE SCIENCES'}</div>
           </div>
           <div className="company-info">
             <div>{company.addressLine1}</div>
             <div>{company.addressLine2}</div>
             <div><strong>Phone:</strong> {company.phone}</div>
-            <div><strong>D.L. No.:</strong> {company.drugLicence || 'GJ-SUR-20-244992/21-244993'}</div>
+            {/* Drug Licence: show only when a real saved value exists — never show XXXX placeholder */}
+            {company.drugLicence && company.drugLicence.trim() && (
+              <div><strong>D.L. No.:</strong> {company.drugLicence}</div>
+            )}
             <div><strong>E-Mail:</strong> {company.email}</div>
             <div><strong>GSTIN:</strong> {company.gstin}</div>
           </div>
         </div>
-
 
         <div className="inv-header-box customer-side">
           <div className="customer-title">M/s {customer?.partyName || 'CASH SALE'}</div>
@@ -82,7 +90,7 @@ export default function InvoicePreview({ invoice, customer }) {
 
       {/* Title & Metadata Strip */}
       <div className="inv-title-bar">
-        <div className="inv-title-text">TAX INVOICE</div>
+        <div className="inv-title-text">GST INVOICE</div>
         <div className="inv-meta-grid">
           <div><strong>Sales Man:</strong> {invoice.salesman || '-'}</div>
           <div><strong>Invoice No.:</strong> <span className="mono bold">{invoice.invoiceNo}</span></div>
@@ -170,14 +178,24 @@ export default function InvoicePreview({ invoice, customer }) {
 
       {/* Bottom Section with 3 Compartments */}
       <div className="inv-bottom-section">
-        {/* Left: Bank details & Terms & Scan */}
+        {/* Left: Bank details & Terms */}
         <div className="inv-bottom-col left-col">
           <div className="bank-box">
             <div className="box-heading">BANK DETAILS:</div>
             <div className="bank-details-content">
-              <div><strong>{COMPANY_CONFIG.bank.bankName.toUpperCase()}</strong></div>
-              <div>A/C NO: {COMPANY_CONFIG.bank.accountNumber}</div>
-              <div>IFSC CODE: {COMPANY_CONFIG.bank.ifsc}</div>
+              {/* Bank details come from live company context — NEVER from COMPANY_CONFIG static defaults */}
+              {bank.bankName ? (
+                <div><strong>{bank.bankName.toUpperCase()}</strong></div>
+              ) : null}
+              {bank.accountNumber ? (
+                <div>A/C NO: {bank.accountNumber}</div>
+              ) : null}
+              {bank.ifsc ? (
+                <div>IFSC CODE: {bank.ifsc}</div>
+              ) : null}
+              {!bank.bankName && !bank.accountNumber && !bank.ifsc && (
+                <div style={{ color: '#888', fontStyle: 'italic' }}>Bank details not configured</div>
+              )}
             </div>
             <div className="ledger-balance-row">
               <strong>LEDGER BALANCE :</strong> Rs. {Number(customer?.currentBalance ?? 0).toFixed(2)}
@@ -187,14 +205,11 @@ export default function InvoicePreview({ invoice, customer }) {
           <div className="terms-box">
             <div className="box-heading">Terms &amp; Conditions</div>
             <ol className="terms-list">
-              {COMPANY_CONFIG.terms.map((t, i) => (
+              {/* Terms come from live company context */}
+              {terms.map((t, i) => (
                 <li key={i}>{t}</li>
               ))}
             </ol>
-          </div>
-
-          <div className="scan-pay-strip">
-            <strong>Scan &amp; Pay:</strong> UPI: laetuslifesciences@okhdfcbank
           </div>
         </div>
 
@@ -293,7 +308,8 @@ export default function InvoicePreview({ invoice, customer }) {
           <div>Receiver Signature &amp; Stamp</div>
         </div>
         <div className="sig-box right-sig">
-          <div className="sig-company-name">{COMPANY_CONFIG.signatoryLabel}</div>
+          {/* Signatory label comes from live company context */}
+          <div className="sig-company-name">{company.signatoryLabel || 'for L LAETUS LIFE SCIENCES'}</div>
           <div className="sig-line"></div>
           <div>Authorized Signatory</div>
         </div>
@@ -301,4 +317,3 @@ export default function InvoicePreview({ invoice, customer }) {
     </div>
   );
 }
-

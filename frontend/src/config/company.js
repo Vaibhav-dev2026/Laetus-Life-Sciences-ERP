@@ -12,14 +12,14 @@ export const COMPANY_CONFIG = {
   stateCode: '24',
   gstin: '24AFSPT7471H1ZR',
   pan: 'AFSPT7471H',
-  drugLicence: 'GJ-SUR-20-XXXXXX / 21-XXXXXX',
+  drugLicence: '',
   phone: '9662031042',
   email: 'laetuslifesciences@gmail.com',
   logo: '/logo.png',
   bank: {
-    bankName: 'HDFC Bank Ltd',
-    accountNumber: '00000000000000',
-    ifsc: 'HDFC0000000',
+    bankName: '',
+    accountNumber: '',
+    ifsc: '',
   },
   invoice: {
     prefix: 'LLS',
