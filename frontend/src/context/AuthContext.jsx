@@ -27,6 +27,7 @@ export function AuthProvider({ children }) {
     setUser(res.user);
     sessionStorage.setItem('laetus_user', JSON.stringify(res.user));
     localStorage.setItem('laetus_user', JSON.stringify(res.user));
+    window.dispatchEvent(new Event('auth:login'));
     return res.user;
   }
 

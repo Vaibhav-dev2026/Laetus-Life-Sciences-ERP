@@ -5,6 +5,7 @@ import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { PageTitleProvider } from './context/PageTitleContext.jsx';
+import { CompanyProvider } from './context/CompanyContext.jsx';
 import './styles/global.css';
 import './styles/print.css';
 
@@ -13,9 +14,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <PageTitleProvider>
-            <App />
-          </PageTitleProvider>
+          <CompanyProvider>
+            <PageTitleProvider>
+              <App />
+            </PageTitleProvider>
+          </CompanyProvider>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

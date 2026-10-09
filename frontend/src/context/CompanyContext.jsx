@@ -30,6 +30,13 @@ export function CompanyProvider({ children }) {
 
   useEffect(() => {
     reloadCompany();
+
+    function handleAuthLogin() {
+      reloadCompany();
+    }
+
+    window.addEventListener('auth:login', handleAuthLogin);
+    return () => window.removeEventListener('auth:login', handleAuthLogin);
   }, []);
 
   const updateCompanyInContext = (data) => {
