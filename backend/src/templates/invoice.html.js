@@ -17,7 +17,6 @@ function renderInvoiceHtml({ company, customer, sale }) {
   const sameState = !s.isInterState;
   const lines = s.lines || [];
 
-  // Terms: use saved company terms, fall back to standard pharmaceutical terms
   const terms = Array.isArray(comp.terms) && comp.terms.length > 0
     ? comp.terms
     : [
@@ -36,7 +35,7 @@ function renderInvoiceHtml({ company, customer, sale }) {
     const iTax = matching.reduce((sum, l) => sum + Number(l.igst || 0), 0);
     const totalTax = sameState ? (cTax + sTax) : iTax;
     return {
-      rate: `${rate.toFixed(2)}%`,
+      rate: `${rate.toFixed(2)} %`,
       amount: taxableAmt,
       cgst: cTax,
       sgst: sTax,
@@ -48,25 +47,35 @@ function renderInvoiceHtml({ company, customer, sale }) {
   const rows = lines.map((l, i) => {
     const halfGstRate = Number(l.gstRate || 0) / 2;
     return `
-    <tr class="${i % 2 === 1 ? 'row-alt' : ''}">
+    <tr>
       <td style="text-align:center;">${i + 1}</td>
       <td style="text-align:left;font-weight:bold;">${escapeHtml(l.productName || l.productId)}</td>
-      <td style="text-align:center;">${escapeHtml(l.pack || '-')}</td>
       <td style="text-align:center;">${escapeHtml(l.mfg || '-')}</td>
       <td style="text-align:center;font-weight:bold;">${l.qty}</td>
-      <td style="text-align:center;">${l.freeQty || 0}</td>
+      <td style="text-align:center;">${escapeHtml(l.pack || '-')}</td>
       <td style="text-align:center;">${escapeHtml(l.batchNo || l.batchId || '-')}</td>
       <td style="text-align:center;">${formatDate(l.expDate)}</td>
       <td style="text-align:center;">${escapeHtml(l.hsn || '-')}</td>
       <td style="text-align:right;">${Number(l.mrp !== undefined ? l.mrp : l.rate).toFixed(2)}</td>
       <td style="text-align:right;">${Number(l.rate).toFixed(2)}</td>
-      <td style="text-align:center;">${l.discountPct || 0}</td>
+      <td style="text-align:center;">${Number(l.discountPct || 0).toFixed(2)}</td>
       ${sameState
-        ? `<td style="text-align:center;">${halfGstRate}%</td><td style="text-align:right;">${Number(l.sgst || 0).toFixed(2)}</td><td style="text-align:center;">${halfGstRate}%</td><td style="text-align:right;">${Number(l.cgst || 0).toFixed(2)}</td>`
-        : `<td style="text-align:center;">${l.gstRate || 0}%</td><td style="text-align:right;">${Number(l.igst || 0).toFixed(2)}</td>`}
+        ? `<td style="text-align:right;">${Number(l.sgst || 0).toFixed(2)}</td><td style="text-align:right;">${Number(l.cgst || 0).toFixed(2)}</td>`
+        : `<td style="text-align:right;">${Number(l.igst || 0).toFixed(2)}</td>`}
       <td style="text-align:right;font-weight:bold;">${Number(l.total || 0).toFixed(2)}</td>
     </tr>`;
   }).join('');
+
+  // Filler empty rows for clean tall grid PDF
+  const minRows = 8;
+  const emptyRowsCount = Math.max(0, minRows - lines.length);
+  const emptyRowsHtml = Array.from({ length: emptyRowsCount }).map(() => `
+    <tr class="empty-row">
+      <td>&nbsp;</td>
+      <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+      ${sameState ? '<td></td><td></td>' : '<td></td>'}
+      <td></td>
+    </tr>`).join('');
 
   const gstRows = gstSummary.map((sum) => `
     <tr>
@@ -78,23 +87,28 @@ function renderInvoiceHtml({ company, customer, sale }) {
       <td style="text-align:right;">${sum.total.toFixed(2)}</td>
     </tr>`).join('');
 
-  // Drug licence: only show when a real value is saved — never emit a XXXX placeholder
   const drugLicenceLine = comp.drugLicence && comp.drugLicence.trim()
-    ? `<strong>D.L. No.:</strong> ${escapeHtml(comp.drugLicence)}<br/>`
+    ? `<div>D.L. No. : ${escapeHtml(comp.drugLicence)}</div>`
     : '';
 
-  // Bank details: use saved values, show nothing if empty (not fake placeholders)
   const bankName = (comp.bank && comp.bank.bankName) ? comp.bank.bankName : '';
   const bankAcct = (comp.bank && comp.bank.accountNumber) ? comp.bank.accountNumber : '';
   const bankIfsc = (comp.bank && comp.bank.ifsc) ? comp.bank.ifsc : '';
   const bankBlock = bankName
-    ? `<strong>${escapeHtml(bankName.toUpperCase())}</strong><br/>
-       ${bankAcct ? `A/C NO: ${escapeHtml(bankAcct)}<br/>` : ''}
-       ${bankIfsc ? `IFSC CODE: ${escapeHtml(bankIfsc)}` : ''}`
-    : '<em style="color:#888;">Bank details not configured</em>';
+    ? `<div><strong>${escapeHtml(bankName.toUpperCase())}</strong></div>
+       ${bankAcct ? `<div>A/C NO-${escapeHtml(bankAcct)}</div>` : ''}
+       ${bankIfsc ? `<div>IFSC CODE-${escapeHtml(bankIfsc)}</div>` : ''}`
+    : '<div style="color:#777;font-style:italic;">Bank details not configured</div>';
 
-  // Terms block from saved company data
-  const termsHtml = terms.map((t, i) => `${i + 1}. ${escapeHtml(t)}`).join('<br/>');
+  const termsHtml = terms.map((t, i) => `<li>${escapeHtml(t)}</li>`).join('');
+
+  const grossBeforeDiscount = s.grossTotal || lines.reduce((a, l) => a + (l.gross || (Number(l.qty) * Number(l.rate))), 0);
+  const discountTotal = s.discountTotal || 0;
+  const sgstTotal = s.sgstTotal || 0;
+  const cgstTotal = s.cgstTotal || 0;
+  const igstTotal = s.igstTotal || 0;
+  const courier = Number(s.courierCharge || 0);
+  const grandTotal = s.grandTotal || 0;
 
   return `<!doctype html>
 <html><head><meta charset="utf-8" />
@@ -102,90 +116,89 @@ function renderInvoiceHtml({ company, customer, sale }) {
 <style>
   @page { size: A4 portrait; margin: 8mm; }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 10px; color: #1a1a1a; margin: 0; padding: 0; background: #fff; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 9.5px; color: #111111; margin: 0; padding: 0; background: #fff; }
 
   /* ── Outer wrapper ── */
-  .doc-wrap { width: 100%; border: 1.5px solid #2c2c2c; }
+  .doc-wrap { width: 100%; border: 1.5px solid #222222; }
 
   /* ── Header: company left / customer right ── */
-  .header-grid { display: flex; border-bottom: 2px solid #2c2c2c; }
-  .header-box { flex: 1; padding: 8px 10px; }
-  .header-box.left { border-right: 1.5px solid #2c2c2c; }
-  .comp-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid #d4a84b33; }
-  .logo-badge { width: 28px; height: 28px; background: linear-gradient(135deg, #c8963c, #e8c06a); color: #1a1a1a; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; flex-shrink: 0; }
-  .comp-title { font-size: 13px; font-weight: 800; color: #111; letter-spacing: 0.02em; }
-  .cust-title { font-size: 12px; font-weight: 700; color: #111; margin-bottom: 4px; }
-  .meta-text { font-size: 9.5px; line-height: 1.5; color: #2a2a2a; }
+  .header-grid { display: flex; border-bottom: 1.5px solid #222222; }
+  .header-box { flex: 1; padding: 6px 10px; }
+  .header-box.left { border-right: 1.5px solid #222222; }
+  .comp-title { font-size: 13px; font-weight: 800; color: #000000; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.02em; }
+  .cust-title { font-size: 12px; font-weight: 800; color: #000000; margin-bottom: 3px; }
+  .meta-text { font-size: 9.5px; line-height: 1.35; color: #111111; }
+  .comp-divider { border-bottom: 1px solid #ccc; margin: 4px 0; }
 
   /* ── GST Invoice title strip ── */
   .title-bar {
-    text-align: center; font-size: 12px; font-weight: 800; letter-spacing: 2px;
-    padding: 4px 0; border-bottom: 1.5px solid #2c2c2c;
-    background: linear-gradient(90deg, #f5edd8 0%, #fdf8ee 40%, #f5edd8 100%);
-    color: #7a5c1e;
+    display: flex; align-items: center; border-bottom: 1.5px solid #222222; background: #fdfdfd;
+  }
+  .title-badge-wrap { flex: 0 0 42%; display: flex; justify-content: center; padding: 4px 8px; }
+  .gst-badge {
+    background: #dbe5ed; border: 1.5px solid #222222; padding: 3px 18px;
+    font-size: 12px; font-weight: 800; letter-spacing: 1.5px; color: #000000; text-transform: uppercase;
   }
 
   /* ── Invoice info bar ── */
   .info-bar {
-    display: flex; justify-content: space-between; padding: 4px 10px;
-    font-size: 10px; background: #fafafa; border-bottom: 1.5px solid #2c2c2c;
+    flex: 1; display: grid; grid-template-columns: 1.3fr 1fr; grid-gap: 2px 12px;
+    padding: 4px 10px; font-size: 9.5px; border-left: 1.5px solid #222222; background: #fafafa;
   }
 
   /* ── Line items table ── */
-  table.items-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
-  table.items-table th, table.items-table td { border: 1px solid #c0c0c0; padding: 3px 4px; }
-  table.items-table th {
-    background: linear-gradient(180deg, #2c2c2c 0%, #1a1a1a 100%);
-    color: #f0d98a;
-    font-weight: 700; text-align: center; font-size: 9.5px; letter-spacing: 0.03em;
-  }
-  table.items-table tr.row-alt td { background: #f9f6ef; }
+  table.items-table { width: 100%; border-collapse: collapse; font-size: 9.5px; border-bottom: 1.5px solid #222222; }
+  table.items-table th, table.items-table td { border: 1px solid #333333; padding: 3px 4px; color: #111111; }
+  table.items-table th { background: #dbe5ed; color: #000000; font-weight: 800; text-align: center; font-size: 9.5px; }
+  .empty-row td { height: 18px; background: transparent !important; }
 
   /* ── Bottom 3-column grid ── */
-  .bottom-grid { display: flex; border-top: 1.5px solid #2c2c2c; }
-  .bottom-col { flex: 1; padding: 6px 8px; border-right: 1px solid #c0c0c0; font-size: 9.5px; }
+  .bottom-grid { display: flex; border-bottom: 1.5px solid #222222; }
+  .bottom-col { flex: 1; padding: 5px 6px; border-right: 1px solid #222222; font-size: 9px; }
   .bottom-col:last-child { border-right: none; flex: 1.1; }
-  .box-head {
-    font-size: 9.5px; font-weight: 700; text-transform: uppercase;
-    color: #7a5c1e; border-bottom: 1px solid #d4a84b55; padding-bottom: 2px; margin-bottom: 4px;
-    letter-spacing: 0.04em;
-  }
+  .box-head-bold { font-size: 9.5px; font-weight: 800; text-transform: uppercase; color: #000000; margin-bottom: 2px; }
 
   /* ── GST summary table ── */
-  table.gst-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 3px; }
-  table.gst-table th, table.gst-table td { border: 1px solid #c0c0c0; padding: 2px 4px; }
-  table.gst-table th { background: #f5edd8; text-align: center; font-weight: 700; color: #5a3e10; }
+  table.gst-table { width: 100%; border-collapse: collapse; font-size: 9px; }
+  table.gst-table th, table.gst-table td { border: 1px solid #333333; padding: 2px 3px; }
+  table.gst-table th { background: #dbe5ed; color: #000000; text-align: center; font-weight: 800; }
 
   /* ── Totals column ── */
-  .tot-line { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted #d0d0d0; font-size: 10px; }
+  .tot-line { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted #bbb; font-size: 9.5px; }
   .grand-line {
-    font-weight: 800; font-size: 12px; color: #fff;
-    background: linear-gradient(90deg, #2c2c2c, #1a1a1a);
-    padding: 4px 6px; margin: 4px -8px -6px;
-    border-top: none; border-bottom: none;
-    display: flex; justify-content: space-between;
+    font-weight: 900; font-size: 11.5px; color: #000000;
+    border-top: 1.5px solid #222222; border-bottom: 1.5px solid #222222;
+    padding: 3px 0; margin-top: 3px; display: flex; justify-content: space-between;
+  }
+  .amount-words-box {
+    margin-top: 5px; font-size: 8.5px; font-style: italic; text-align: right;
+    border: 1px solid #999999; padding: 2px 4px; background: #fafafa;
   }
 
   /* ── Signature strip ── */
-  .sig-strip { display: flex; justify-content: space-between; border-top: 1.5px solid #2c2c2c; padding: 18px 16px 8px; font-size: 9.5px; }
-  .sig-box { width: 180px; text-align: center; }
-  .sig-line { border-bottom: 1px solid #555; height: 22px; margin-bottom: 4px; }
+  .sig-strip { display: flex; justify-content: space-between; padding: 12px 14px 6px; font-size: 9.5px; }
+  .sig-box { width: 180px; }
+  .sig-box.left-sig { text-align: left; }
+  .sig-box.right-sig { text-align: right; }
+  .sig-title { font-weight: 800; margin-bottom: 16px; }
+  .sig-space { height: 16px; }
 </style></head>
 <body>
   <div class="doc-wrap">
     <div class="header-grid">
       <div class="header-box left">
-        <div class="comp-brand">
-          ${comp.logo ? `<img src="${comp.logo}" style="max-height:30px;max-width:80px;object-fit:contain;" />` : `<div class="logo-badge">${escapeHtml(comp.name ? comp.name.split(' ').map(w => w[0]).join('').slice(0, 3) : 'LLS')}</div>`}
-          <div class="comp-title">${escapeHtml(comp.name || 'L LAETUS LIFE SCIENCES')}</div>
-        </div>
+        <div class="comp-title">${escapeHtml(comp.name || 'LAETUS LIFE SCIENCES')}</div>
         <div class="meta-text">
           ${escapeHtml(comp.addressLine1 || '')}<br/>
           ${escapeHtml(comp.addressLine2 || '')}<br/>
-          <strong>Phone:</strong> ${escapeHtml(comp.phone || '')}<br/>
+          Phone : ${escapeHtml(comp.phone || '0261-2345678')}
+        </div>
+        <div class="comp-divider"></div>
+        <div class="meta-text">
+          GSTIN : ${escapeHtml(comp.gstin || '-')}<br/>
+          ${comp.email ? `Email : ${escapeHtml(comp.email)}<br/>` : ''}
+          ${comp.website ? `Website : ${escapeHtml(comp.website)}<br/>` : ''}
           ${drugLicenceLine}
-          <strong>E-Mail:</strong> ${escapeHtml(comp.email || '')}<br/>
-          <strong>GSTIN:</strong> ${escapeHtml(comp.gstin || '')}
         </div>
       </div>
       <div class="header-box">
@@ -193,61 +206,67 @@ function renderInvoiceHtml({ company, customer, sale }) {
         <div class="meta-text">
           ${escapeHtml(cust.address || 'Address: N/A')}<br/>
           ${escapeHtml(cust.city || '')}${cust.state ? `, ${escapeHtml(cust.state)}` : ''}<br/>
-          <strong>Ph. No.:</strong> ${escapeHtml(cust.phone || cust.mobile || '-')}<br/>
-          <strong>GSTIN:</strong> ${escapeHtml(cust.gstin || '-')} &nbsp; <strong>D.L. No.:</strong> ${escapeHtml(cust.drugLicence || '-')}
+          Ph No: ${escapeHtml(cust.phone || cust.mobile || '-')}<br/>
+          GST: ${escapeHtml(cust.gstin || '-')}<br/>
+          ${cust.drugLicence ? `D.L. No.: ${escapeHtml(cust.drugLicence)}` : ''}
         </div>
       </div>
     </div>
 
-    <div class="title-bar">GST INVOICE</div>
-
-    <div class="info-bar">
-      <div><strong>Sales Man:</strong> ${escapeHtml(s.salesman || '-')}</div>
-      <div><strong>Invoice No.:</strong> <strong>${escapeHtml(s.invoiceNo || s.id || '')}</strong></div>
-      <div><strong>Invoice Date:</strong> ${formatDate(s.date)}</div>
-      <div><strong>Due Date:</strong> ${formatDate(s.dueDate || s.date)}</div>
+    <div class="title-bar">
+      <div class="title-badge-wrap">
+        <div class="gst-badge">GST INVOICE</div>
+      </div>
+      <div class="info-bar">
+        <div><span>Invoice No. :</span> <strong>${escapeHtml(s.invoiceNo || s.id || '')}</strong></div>
+        <div><span>Date :</span> <span>${formatDate(s.date)}</span></div>
+        <div><span>Sales Man :</span> <span>${escapeHtml(s.salesman || '-')}</span></div>
+        <div><span>Due Date :</span> <span>${formatDate(s.dueDate || s.date)}</span></div>
+      </div>
     </div>
 
     <table class="items-table">
       <thead><tr>
-        <th style="width:3%">Sr.</th>
-        <th style="width:20%">Product</th>
-        <th style="width:8%">Packing</th>
-        <th style="width:7%">Mfg</th>
-        <th style="width:5%">Qty</th>
-        <th style="width:5%">Free</th>
-        <th style="width:8%">Batch</th>
-        <th style="width:7%">Exp</th>
-        <th style="width:7%">HSN</th>
-        <th style="width:6%">MRP</th>
-        <th style="width:6%">PTR/Rate</th>
-        <th style="width:5%">Dis%</th>
-        ${sameState ? '<th style="width:4%">SGST%</th><th style="width:5%">SGST</th><th style="width:4%">CGST%</th><th style="width:5%">CGST</th>' : '<th style="width:5%">IGST%</th><th style="width:6%">IGST</th>'}
-        <th style="width:8%">Amount</th>
+        <th style="width:4%">Sr.</th>
+        <th style="width:22%">Product</th>
+        <th style="width:8%">Mfg.</th>
+        <th style="width:5%">Qty.</th>
+        <th style="width:7%">Pack</th>
+        <th style="width:9%">Batch</th>
+        <th style="width:6%">Exp.</th>
+        <th style="width:8%">HSN</th>
+        <th style="width:7%">MRP</th>
+        <th style="width:7%">Rate</th>
+        <th style="width:4%">Dis</th>
+        ${sameState ? '<th style="width:5%">SGST</th><th style="width:5%">CGST</th>' : '<th style="width:10%">IGST</th>'}
+        <th style="width:9%">Amount</th>
       </tr></thead>
-      <tbody>${rows}</tbody>
+      <tbody>
+        ${rows}
+        ${emptyRowsHtml}
+      </tbody>
     </table>
 
     <div class="bottom-grid">
       <div class="bottom-col">
-        <div class="box-head">BANK DETAILS:</div>
+        <div class="box-head-bold">BANK DETAIL:</div>
         <div class="meta-text">
           ${bankBlock}
         </div>
-        <div class="meta-text" style="margin-top:5px;border-top:1px dashed #c8a848;padding-top:3px;">
-          <strong>LEDGER BALANCE:</strong> Rs. ${Number(cust.currentBalance || 0).toFixed(2)}
+        <div class="meta-text" style="margin-top:4px;border-top:1px solid #222;border-bottom:1px solid #222;padding:2px 0;">
+          <strong>LEDGER BALANCE :</strong> Rs. ${Number(cust.currentBalance || 0).toFixed(2)}
         </div>
-        <div class="box-head" style="margin-top:7px;">Terms &amp; Conditions</div>
-        <div class="meta-text" style="font-size:8.5px;line-height:1.4;">
+        <div style="margin-top:4px;font-size:9px;font-weight:800;text-decoration:underline;">Terms &amp; Conditions:</div>
+        <ol style="font-size:8.5px;line-height:1.3;margin:0;padding-left:12px;">
           ${termsHtml}
-        </div>
+        </ol>
+        <div style="margin-top:4px;font-size:8.5px;font-weight:800;text-align:center;border:1px solid #ccc;padding:1px 0;">Scan &amp; Pay</div>
       </div>
 
       <div class="bottom-col">
-        <div class="box-head" style="text-align:center;">GST SUMMARY</div>
         <table class="gst-table">
           <thead><tr>
-            <th>GST Rate</th><th>Taxable</th>
+            <th>GST</th><th>Amount</th>
             ${sameState ? '<th>CGST</th><th>SGST</th>' : '<th>IGST</th>'}
             <th>TOTAL</th>
           </tr></thead>
@@ -256,29 +275,28 @@ function renderInvoiceHtml({ company, customer, sale }) {
       </div>
 
       <div class="bottom-col">
-        <div class="tot-line"><span>AMOUNT BEFORE TAX</span><span>${formatCurrency(s.grossTotal || ((s.taxableTotal || 0) + (s.discountTotal || 0)))}</span></div>
-        <div class="tot-line"><span>DISCOUNT</span><span>${formatCurrency(s.discountTotal || 0)}</span></div>
-        <div class="tot-line"><span>TAXABLE TOTAL</span><span>${formatCurrency(s.taxableTotal || 0)}</span></div>
+        <div class="tot-line"><span>AMOUNT BEFORE TAX</span><span>${Number(grossBeforeDiscount).toFixed(2)}</span></div>
+        <div class="tot-line"><span>DISCOUNT :</span><span>${Number(discountTotal).toFixed(2)}</span></div>
         ${sameState
-          ? `<div class="tot-line"><span>SGST PAYABLE</span><span>${formatCurrency(s.sgstTotal || 0)}</span></div><div class="tot-line"><span>CGST PAYABLE</span><span>${formatCurrency(s.cgstTotal || 0)}</span></div>`
-          : `<div class="tot-line"><span>IGST PAYABLE</span><span>${formatCurrency(s.igstTotal || 0)}</span></div>`}
-        ${s.courierCharge ? `<div class="tot-line"><span>COURIER / OTHER</span><span>${formatCurrency(s.courierCharge)}</span></div>` : ''}
-        <div class="tot-line grand-line"><span>GRAND TOTAL</span><span>${formatCurrency(s.grandTotal || 0)}</span></div>
-        <div class="meta-text" style="margin-top:8px;border-top:1px solid #c8a848;padding-top:2px;">
-          <strong>Amount in Words:</strong> Rupees ${Number(s.grandTotal || 0).toFixed(2)} Only
+          ? `<div class="tot-line"><span>SGST PAYBLE</span><span>${Number(sgstTotal).toFixed(2)}</span></div><div class="tot-line"><span>CGST PAYBLE</span><span>${Number(cgstTotal).toFixed(2)}</span></div>`
+          : `<div class="tot-line"><span>IGST PAYBLE</span><span>${Number(igstTotal).toFixed(2)}</span></div>`}
+        <div class="tot-line"><span>COURIER CHR</span><span>${Number(courier).toFixed(2)}</span></div>
+        <div class="tot-line grand-line"><span>GRAND TOTAL</span><span>${Number(grandTotal).toFixed(2)}</span></div>
+        <div class="amount-words-box">
+          Rs. ${Number(grandTotal).toFixed(2)} Only
         </div>
       </div>
     </div>
 
     <div class="sig-strip">
-      <div class="sig-box">
-        <div class="sig-line"></div>
-        <div>Receiver Signature &amp; Stamp</div>
+      <div class="sig-box left-sig">
+        <div class="sig-title">Receiver</div>
+        <div class="sig-space"></div>
       </div>
-      <div class="sig-box">
-        <div style="font-weight:bold;margin-bottom:8px;">${escapeHtml(comp.signatoryLabel || 'for L LAETUS LIFE SCIENCES')}</div>
-        <div class="sig-line"></div>
-        <div>Authorized Signatory</div>
+      <div class="sig-box right-sig">
+        <div class="sig-title">For ${escapeHtml(comp.name || 'LAETUS LIFE SCIENCES')}</div>
+        <div class="sig-space"></div>
+        <div style="font-size:8.5px;">Authorized Signatory</div>
       </div>
     </div>
   </div>
