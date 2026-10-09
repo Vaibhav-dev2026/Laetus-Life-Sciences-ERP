@@ -5,6 +5,7 @@ const { renderPurchaseHtml } = require('../templates/purchase.html');
 const { renderPaymentReceiptHtml } = require('../templates/paymentReceipt.html');
 const { renderLedgerHtml } = require('../templates/ledger.html');
 const { renderReportTableHtml } = require('../templates/reportTable.html');
+const { renderGstr3bHtml } = require('../templates/gstr3b.html');
 
 const SYSTEM_CHROME_PATHS = [
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -132,9 +133,14 @@ async function generateLedgerPdf({ company, party, partyType, entries, openingBa
   return generatePdfFromHtml(html, { format: 'A4', landscape: false });
 }
 
-async function generateReportPdf({ title, columns, rows, company, filters }) {
-  const html = renderReportTableHtml({ title, columns, rows, company, filters });
+async function generateReportPdf({ title, columns, rows, company, filters, groupBy }) {
+  const html = renderReportTableHtml({ title, columns, rows, company, filters, groupBy });
   return generatePdfFromHtml(html, { format: 'A4', landscape: true });
+}
+
+async function generateGstr3bPdf({ company, data, filters }) {
+  const html = renderGstr3bHtml({ company, data, filters });
+  return generatePdfFromHtml(html, { format: 'A4', landscape: false });
 }
 
 module.exports = {
@@ -144,4 +150,5 @@ module.exports = {
   generatePaymentPdf,
   generateLedgerPdf,
   generateReportPdf,
+  generateGstr3bPdf,
 };

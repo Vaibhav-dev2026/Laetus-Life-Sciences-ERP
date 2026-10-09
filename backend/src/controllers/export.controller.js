@@ -1,12 +1,17 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { buildExcel, buildDocx } = require('../services/export.service');
-const { generateReportPdf } = require('../services/pdf.service');
+const { generateReportPdf, generateGstr3bPdf } = require('../services/pdf.service');
 const { Company } = require('../models');
 const { normalizeCompany } = require('../utils/companyHelper');
-const { outstandingRows, salesRows, purchasesRows, stockRows, customersRows, suppliersRows, productsRows, gstr1Rows, itcRows, gstr3bRows, paymentsRows, expensesRows } = require('../services/reportRows.service');
+const {
+  outstandingRows, salesRows, purchasesRows, stockRows,
+  customersRows, suppliersRows, productsRows, gstr1Rows,
+  itcRows, gstr3bRows, paymentsRows, expensesRows,
+} = require('../services/reportRows.service');
+const { getGstr3bData } = require('../services/gstReport.service');
 
-// Central export endpoint: GET /api/exports/:report?format=xlsx|docx|csv|pdf
+// Central export endpoint: GET /api/exports/:report/:format
 // report ∈ outstanding | sales | purchases | stock | customers | suppliers | products | gstr1 | itc_reconciliation | gstr3b | payments | expenses
 const REPORT_BUILDERS = {
   outstanding: outstandingRows,
@@ -23,6 +28,13 @@ const REPORT_BUILDERS = {
   expenses: expensesRows,
 };
 
+// Reports that should group rows in the PDF by a specific field
+const REPORT_GROUP_BY = {
+  outstanding: 'partyName',
+  gstr1: 'category',
+  itc_reconciliation: 'status',
+};
+
 const exportReport = asyncHandler(async (req, res) => {
   const { report, format } = req.params;
   const builder = REPORT_BUILDERS[report];
@@ -34,8 +46,19 @@ const exportReport = asyncHandler(async (req, res) => {
 
   if (format === 'pdf') {
     const company = normalizeCompany(await Company.findOne());
+
     try {
-      const rawPdf = await generateReportPdf({ title, columns, rows, company, filters: req.query });
+      let rawPdf;
+
+      // GSTR-3B gets its own statutory portrait PDF
+      if (report === 'gstr3b') {
+        const data = await getGstr3bData(req.query);
+        rawPdf = await generateGstr3bPdf({ company, data, filters: req.query });
+      } else {
+        const groupBy = REPORT_GROUP_BY[report] || null;
+        rawPdf = await generateReportPdf({ title, columns, rows, company, filters: req.query, groupBy });
+      }
+
       const pdfBuffer = Buffer.isBuffer(rawPdf) ? rawPdf : Buffer.from(rawPdf);
       const isPdf = pdfBuffer.length > 5 && pdfBuffer.slice(0, 5).toString('utf-8') === '%PDF-';
       const mimeType = isPdf ? 'application/pdf' : 'text/html; charset=utf-8';
