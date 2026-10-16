@@ -52,6 +52,7 @@ function renderInvoiceHtml({ company, customer, sale }) {
       <td style="text-align:left;font-weight:bold;">${escapeHtml(l.productName || l.productId)}</td>
       <td style="text-align:center;">${escapeHtml(l.mfg || '-')}</td>
       <td style="text-align:center;font-weight:bold;">${l.qty}</td>
+      <td style="text-align:center;">${Number(l.freeQty ?? 0)}</td>
       <td style="text-align:center;">${escapeHtml(l.pack || '-')}</td>
       <td style="text-align:center;">${escapeHtml(l.batchNo || l.batchId || '-')}</td>
       <td style="text-align:center;">${formatDate(l.expDate)}</td>
@@ -72,7 +73,7 @@ function renderInvoiceHtml({ company, customer, sale }) {
   const emptyRowsHtml = Array.from({ length: emptyRowsCount }).map(() => `
     <tr class="empty-row">
       <td>&nbsp;</td>
-      <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+      <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
       ${sameState ? '<td></td><td></td>' : '<td></td>'}
       <td></td>
     </tr>`).join('');
@@ -228,13 +229,14 @@ function renderInvoiceHtml({ company, customer, sale }) {
     <table class="items-table">
       <thead><tr>
         <th style="width:4%">Sr.</th>
-        <th style="width:22%">Product</th>
-        <th style="width:8%">Mfg.</th>
-        <th style="width:5%">Qty.</th>
-        <th style="width:7%">Pack</th>
+        <th style="width:21%">Product</th>
+        <th style="width:7%">Mfg.</th>
+        <th style="width:4%">Qty.</th>
+        <th style="width:4%">Free</th>
+        <th style="width:6%">Pack</th>
         <th style="width:9%">Batch</th>
         <th style="width:6%">Exp.</th>
-        <th style="width:8%">HSN</th>
+        <th style="width:7%">HSN</th>
         <th style="width:7%">MRP</th>
         <th style="width:7%">Rate</th>
         <th style="width:4%">Dis</th>

@@ -106,13 +106,14 @@ export default function InvoicePreview({ invoice, customer }) {
         <thead>
           <tr>
             <th style={{ width: '4%' }}>Sr.</th>
-            <th style={{ width: '22%' }}>Product</th>
-            <th style={{ width: '8%' }}>Mfg.</th>
-            <th style={{ width: '5%' }}>Qty.</th>
-            <th style={{ width: '7%' }}>Pack</th>
+            <th style={{ width: '21%' }}>Product</th>
+            <th style={{ width: '7%' }}>Mfg.</th>
+            <th style={{ width: '4%' }}>Qty.</th>
+            <th style={{ width: '4%' }}>Free</th>
+            <th style={{ width: '6%' }}>Pack</th>
             <th style={{ width: '9%' }}>Batch</th>
             <th style={{ width: '6%' }}>Exp.</th>
-            <th style={{ width: '8%' }}>HSN</th>
+            <th style={{ width: '7%' }}>HSN</th>
             <th style={{ width: '7%' }}>MRP</th>
             <th style={{ width: '7%' }}>Rate</th>
             <th style={{ width: '4%' }}>Dis</th>
@@ -136,6 +137,7 @@ export default function InvoicePreview({ invoice, customer }) {
                 <td style={{ textAlign: 'left', fontWeight: 700 }}>{l.productName || l.productId}</td>
                 <td style={{ textAlign: 'center' }}>{l.mfg || '-'}</td>
                 <td style={{ textAlign: 'center', fontWeight: 700 }}>{l.qty}</td>
+                <td style={{ textAlign: 'center' }}>{Number(l.freeQty ?? 0)}</td>
                 <td style={{ textAlign: 'center' }}>{l.pack || '-'}</td>
                 <td style={{ textAlign: 'center' }}>{l.batchNo || l.batchId}</td>
                 <td style={{ textAlign: 'center' }}>{l.expDate ? formatDate(l.expDate) : '-'}</td>
@@ -160,7 +162,7 @@ export default function InvoicePreview({ invoice, customer }) {
           {Array.from({ length: emptyRowsCount }).map((_, idx) => (
             <tr key={`empty-${idx}`} className="empty-row">
               <td>&nbsp;</td>
-              <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+              <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
               {sameState ? <><td></td><td></td></> : <td></td>}
               <td></td>
             </tr>
