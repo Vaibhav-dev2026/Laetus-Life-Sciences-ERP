@@ -24,6 +24,25 @@ export default function PaymentList() {
   usePageTitle('Payments');
   const toast = useToast();
   const [downloadingId, setDownloadingId] = useState(null);
+  const [reconciling, setReconciling] = useState(false);
+
+  async function handleReconcile() {
+    setReconciling(true);
+    try {
+      const { default: axiosClient } = await import('../../api/axiosClient.js');
+      await axiosClient.post('/payments/reconcile');
+      toast.success('Financial allocations reconciled successfully.');
+      reload();
+      reloadCustomers();
+      reloadSuppliers();
+      reloadSales();
+      reloadPurchases();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Could not reconcile allocations.');
+    } finally {
+      setReconciling(false);
+    }
+  }
 
   async function handleDownloadReceipt(payment) {
     setDownloadingId(payment.id);
@@ -71,7 +90,10 @@ export default function PaymentList() {
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
-    return rows.filter((r) => !q || [r.partyName, r.reference, r.invoiceId, r.id].join(' ').toLowerCase().includes(q));
+    return rows.filter((r) => {
+      const invText = r.allocations?.map((a) => a.invoiceNo || a.invoiceId).join(' ') || r.invoiceId || '';
+      return !q || [r.partyName, r.reference, invText, r.id].join(' ').toLowerCase().includes(q);
+    });
   }, [rows, debouncedSearch]);
 
   const filteredParties = useMemo(() => {
@@ -219,7 +241,23 @@ export default function PaymentList() {
     { key: 'id', label: 'Payment ID', className: 'mono' },
     { key: 'partyName', label: 'Party' },
     { key: 'partyType', label: 'Party Type' },
-    { key: 'invoiceId', label: 'Invoice' },
+    {
+      key: 'invoice',
+      label: 'Invoice',
+      render: (r) => {
+        if (r.allocations && r.allocations.length > 0) {
+          return r.allocations.map((a) => a.invoiceNo || a.invoiceId).join(', ');
+        }
+        if (r.invoiceId) {
+          const sale = sales?.find((s) => s.id === r.invoiceId || s.invoiceNo === r.invoiceId);
+          if (sale) return sale.invoiceNo;
+          const pur = purchases?.find((p) => p.id === r.invoiceId || p.purchaseInvoiceNo === r.invoiceId || p.supplierInvoiceNo === r.invoiceId);
+          if (pur) return pur.purchaseInvoiceNo || pur.supplierInvoiceNo;
+          return r.invoiceId;
+        }
+        return <span className="text-muted" style={{ fontStyle: 'italic', fontSize: '0.85rem' }}>Auto-allocated (FIFO)</span>;
+      },
+    },
     { key: 'amount', label: 'Amount', align: 'right', render: (r) => formatCurrency(r.amount) },
     { key: 'mode', label: 'Mode' },
     { key: 'date', label: 'Date', render: (r) => formatDate(r.date) },
@@ -249,6 +287,9 @@ export default function PaymentList() {
         actions={(
           <>
             <ExportActions reportKey="payments" filename="payments_register" />
+            <button className="btn btn-secondary" onClick={handleReconcile} disabled={reconciling}>
+              {reconciling ? 'Reconciling…' : '⚡ Reconcile'}
+            </button>
             <button className="btn btn-primary" onClick={handleOpenModal}>+ Record Payment</button>
           </>
         )}

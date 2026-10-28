@@ -8,5 +8,6 @@ router.use(authenticate);
 router.get('/', ctrl.list);
 router.get('/:id/pdf', pdfCtrl.downloadPayment);
 router.post('/', requireRole('Admin', 'Accounts', 'Billing'), ctrl.create);
+router.post('/reconcile', requireRole('Admin', 'Accounts'), ctrl.reconcile);
 
 module.exports = router;

@@ -5,6 +5,7 @@ const ApiError = require('../utils/ApiError');
 const { generateId } = require('../utils/idGenerator');
 const { Payment, Sale, Purchase, Customer, Supplier } = require('../models');
 const { postCustomerEntry, postSupplierEntry, lastCustomerBalance, lastSupplierBalance } = require('../services/ledger.service');
+const { reconcileAllFinancialAllocations } = require('../services/reconciliation.service');
 const { logAudit } = require('../services/audit.service');
 const { round2 } = require('../utils/money');
 const { withTransaction } = require('../utils/transaction.util');
@@ -40,7 +41,7 @@ async function allocateCustomerFifo(partyId, amount, priorityInvoiceId, opts) {
   // Re-order so priority invoice comes first
   let ordered = openSales;
   if (priorityInvoiceId) {
-    const idx = openSales.findIndex((s) => s.id === priorityInvoiceId);
+    const idx = openSales.findIndex((s) => s.id === priorityInvoiceId || s.invoiceNo === priorityInvoiceId);
     if (idx > 0) {
       ordered = [openSales[idx], ...openSales.slice(0, idx), ...openSales.slice(idx + 1)];
     }
@@ -88,7 +89,7 @@ async function allocateSupplierFifo(partyId, amount, priorityInvoiceId, opts) {
   // Re-order so priority invoice comes first
   let ordered = openPurchases;
   if (priorityInvoiceId) {
-    const idx = openPurchases.findIndex((p) => p.id === priorityInvoiceId);
+    const idx = openPurchases.findIndex((p) => p.id === priorityInvoiceId || p.purchaseInvoiceNo === priorityInvoiceId || p.supplierInvoiceNo === priorityInvoiceId);
     if (idx > 0) {
       ordered = [openPurchases[idx], ...openPurchases.slice(0, idx), ...openPurchases.slice(idx + 1)];
     }
@@ -161,13 +162,13 @@ const create = asyncHandler(async (req, res) => {
     // ------------------------------------------------------------------
     if (invoiceId) {
       if (partyType === 'Customer') {
-        const sale = await Sale.findOne({ id: invoiceId }, null, opts);
+        const sale = await Sale.findOne({ $or: [{ id: invoiceId }, { invoiceNo: invoiceId }] }, null, opts);
         if (!sale) throw ApiError.notFound('Invoice not found');
         if (numAmount > sale.balance + 0.01) {
           throw ApiError.badRequest(`Payment amount (₹${numAmount.toFixed(2)}) cannot exceed the outstanding balance for invoice ${sale.invoiceNo} (₹${sale.balance.toFixed(2)})`);
         }
       } else {
-        const purchase = await Purchase.findOne({ id: invoiceId }, null, opts);
+        const purchase = await Purchase.findOne({ $or: [{ id: invoiceId }, { purchaseInvoiceNo: invoiceId }, { supplierInvoiceNo: invoiceId }] }, null, opts);
         if (!purchase) throw ApiError.notFound('Purchase not found');
         const purchaseBalance = purchase.balance !== undefined
           ? purchase.balance
@@ -222,6 +223,8 @@ const create = asyncHandler(async (req, res) => {
       reference,
       remarks,
       createdBy: req.user?.name,
+      allocations: allocationSummary,
+      isAllocated: true,
     }], opts);
 
     // ------------------------------------------------------------------
@@ -240,4 +243,9 @@ const create = asyncHandler(async (req, res) => {
   return ApiResponse.created(res, { message: 'Payment recorded successfully', data: saved });
 });
 
-module.exports = { list, create };
+const reconcile = asyncHandler(async (req, res) => {
+  const result = await reconcileAllFinancialAllocations();
+  return ApiResponse.success(res, { message: 'Financial allocations reconciled successfully', data: result });
+});
+
+module.exports = { list, create, reconcile };

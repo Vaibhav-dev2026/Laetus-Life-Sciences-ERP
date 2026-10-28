@@ -492,7 +492,9 @@ async function paymentsRows(query = {}) {
     date: dayjs(p.date).format('DD-MM-YYYY'),
     partyName: p.partyType === 'Customer' ? (custMap.get(p.partyId) || p.partyId) : (suppMap.get(p.partyId) || p.partyId),
     partyType: p.partyType,
-    invoiceId: p.invoiceId || '-',
+    invoiceId: p.allocations && p.allocations.length > 0
+      ? p.allocations.map((a) => a.invoiceNo || a.invoiceId).join(', ')
+      : (p.invoiceId || 'Auto (FIFO)'),
     amount: round2(p.amount || 0),
     mode: p.mode,
     reference: p.reference || '-',

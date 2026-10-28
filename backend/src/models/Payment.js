@@ -11,6 +11,12 @@ const paymentSchema = new mongoose.Schema({
   reference: { type: String, default: '' },
   remarks: { type: String, default: '' },
   createdBy: { type: String, default: '' },
+  allocations: [{
+    invoiceId: { type: String, required: true },
+    invoiceNo: { type: String, default: '' },
+    appliedAmount: { type: Number, required: true },
+  }],
+  isAllocated: { type: Boolean, default: false },
 }, { timestamps: true });
 
 paymentSchema.index({ partyId: 1, date: -1 });

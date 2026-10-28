@@ -12,6 +12,15 @@ async function start() {
   await connectDB();
   await ensureProductionAdmin();
 
+  // Run non-destructive, idempotent financial reconciliation on startup
+  try {
+    const { reconcileAllFinancialAllocations } = require('./src/services/reconciliation.service');
+    const recResult = await reconcileAllFinancialAllocations();
+    console.log(`[reconciliation] Reconciled ${recResult.reconciledCustomers} customers and ${recResult.reconciledSuppliers} suppliers.`);
+  } catch (err) {
+    console.warn('[reconciliation] Startup reconciliation warning:', err.message);
+  }
+
   // Bind to 0.0.0.0 explicitly so the server accepts traffic on all network
   // interfaces, which is required on cloud hosts such as Render.
   server = app.listen(env.port, '0.0.0.0', () => {
