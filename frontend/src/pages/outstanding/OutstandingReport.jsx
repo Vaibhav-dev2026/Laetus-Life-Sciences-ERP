@@ -57,10 +57,13 @@ export default function OutstandingReport() {
 
     return sorted.map((s) => {
       const customer = customerMap.get(s.customerId);
-      const sameState = (customer?.stateCode || COMPANY_CONFIG.stateCode) === COMPANY_CONFIG.stateCode;
-      const billAmount = s.grandTotal || (s.lines || []).reduce((a, l) => a + calcLine({ ...l, sameState }).total, 0);
+      const billAmount = s.grandTotal || 0;
       const received = Number(s.amountReceived || 0);
-      const balance = Math.max(0, billAmount - received);
+      // Use Sale.balance (server-authoritative, kept in sync by payment controller).
+      // Fall back to (grandTotal - amountReceived) for legacy records that pre-date this field.
+      const balance = s.balance !== undefined && s.balance !== null
+        ? Math.max(0, Number(s.balance))
+        : Math.max(0, billAmount - received);
       
       const dueDate = s.dueDate || s.date;
       const daysOverdue = Math.max(0, daysBetween(dueDate, today));

@@ -41,6 +41,7 @@ const purchaseSchema = new mongoose.Schema({
   igstTotal: { type: Number, required: true },
   grandTotal: { type: Number, required: true },
   amountPaid: { type: Number, default: 0 },
+  balance: { type: Number, default: 0 },      // grandTotal - amountPaid — kept in sync by payment controller
   paymentStatus: { type: String, enum: ['Unpaid', 'Partial', 'Paid'], default: 'Unpaid' },
   status: { type: String, enum: ['Active', 'Cancelled'], default: 'Active' },
   cancelReason: { type: String, default: '' },

@@ -188,6 +188,7 @@ const create = asyncHandler(async (req, res) => {
       lines: computedLines.map(({ gross, discountAmt, ...rest }) => rest),
       ...totals,
       amountPaid: effectiveAmountPaid,
+      balance: round2(totals.grandTotal - effectiveAmountPaid),
       paymentStatus: effectivePaymentStatus,
       financialYear,
       createdBy: req.user?.name,
@@ -351,6 +352,7 @@ const update = asyncHandler(async (req, res) => {
     purchase.igstTotal = totals.igstTotal;
     purchase.grandTotal = totals.grandTotal;
     purchase.amountPaid = effectiveAmountPaid;
+    purchase.balance = round2(totals.grandTotal - effectiveAmountPaid);
     purchase.paymentStatus = effectivePaymentStatus;
 
     await purchase.save(opts);

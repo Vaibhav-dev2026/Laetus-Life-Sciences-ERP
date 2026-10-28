@@ -1,0 +1,27 @@
+flowchart TD
+    subgraph SalesReturnFlow["Sales Return (Customer Credit Note)"]
+        SR_Start([Customer Return Request]) --> SR_SelectSale[Select Sale/Invoice INV-000001]
+        SR_SelectSale --> SR_Validate[Verify Return Qty <= Original Sale Line Qty]
+        SR_Validate --> SR_Tx[Start Transaction]
+        SR_Tx --> SR_GenId[Generate Return ID: SR-000001]
+        SR_GenId --> SR_Stock[Restore Batch Stock ProductBatch.currentQty += returnQty]
+        SR_Stock --> SR_Movement[Write StockMovement: type='SalesReturn', qty=+returnQty]
+        SR_Movement --> SR_ProductSync[Sync Product.currentStock]
+        SR_ProductSync --> SR_Ledger[Post CustomerLedger: credit=refundAmount, seq++]
+        SR_Ledger --> SR_Save[Save SalesReturn record]
+        SR_Save --> SR_Commit[Commit Transaction]
+    end
+
+    subgraph PurchaseReturnFlow["Purchase Return (Supplier Debit Note)"]
+        PR_Start([Supplier Return Request]) --> PR_SelectPur[Select Purchase PUR-000001]
+        PR_SelectPur --> PR_Validate[Verify Return Qty <= Original Purchase Line Qty]
+        PR_Validate --> PR_StockCheck[Verify Batch Current Stock >= Return Qty]
+        PR_StockCheck --> PR_Tx[Start Transaction]
+        PR_Tx --> PR_GenId[Generate Return ID: PR-000001]
+        PR_GenId --> PR_Stock[Deduct Batch Stock ProductBatch.currentQty -= returnQty]
+        PR_Stock --> PR_Movement[Write StockMovement: type='PurchaseReturn', qty=-returnQty]
+        PR_Movement --> PR_ProductSync[Sync Product.currentStock]
+        PR_ProductSync --> PR_Ledger[Post SupplierLedger: debit=payableAdjustment, seq++]
+        PR_Ledger --> PR_Save[Save PurchaseReturn record]
+        PR_Save --> PR_Commit[Commit Transaction]
+    end

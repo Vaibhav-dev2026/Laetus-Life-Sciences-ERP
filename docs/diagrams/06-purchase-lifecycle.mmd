@@ -1,0 +1,25 @@
+flowchart TD
+    Start([Purchase Entry Form]) --> SelectSupp[Select Supplier & Inward Details]
+    SelectSupp --> InwardLines[Add Line Items: Product, Batch No, Mfg Date, Exp Date, Rate, Qty, Free Qty, GST%]
+    InwardLines --> CheckTaxState{Supplier State == Company State?}
+    CheckTaxState -->|Same State: 24| IntraTax[Intra-State: CGST 50% + SGST 50%]
+    CheckTaxState -->|Different State| InterTax[Inter-State: IGST 100%]
+    
+    IntraTax --> CalcTotals[Calculate Document Totals & Verify Positive Values]
+    InterTax --> CalcTotals
+    
+    CalcTotals --> StartTx[Start MongoDB Transaction / Session]
+    StartTx --> GenPurId[Generate Internal ID: PUR-000001 via idGenerator]
+    GenPurId --> BatchUpsert{Batch with productId + batchNo Exists?}
+    
+    BatchUpsert -->|Yes| UpdateBatch[Accumulate ProductBatch.currentQty += Qty + FreeQty<br/>Update purchaseRate, saleRate, expDate]
+    BatchUpsert -->|No| CreateBatch[Create New ProductBatch: BAT-000001<br/>Set initial currentQty = Qty + FreeQty]
+    
+    UpdateBatch --> RecordMovement[Write StockMovement: type=Purchase, qty=+totalInward]
+    CreateBatch --> RecordMovement
+    
+    RecordMovement --> SyncProduct[Sync Product.currentStock = sum active batches]
+    SyncProduct --> PostSuppLedger[Post SupplierLedger: credit=grandTotal, seq++, running balance]
+    PostSuppLedger --> SavePurchase[Save Purchase Document with lines]
+    SavePurchase --> CommitTx[Commit Transaction]
+    CommitTx --> Done[Purchase Saved & Stock Immediately Available for Sale]

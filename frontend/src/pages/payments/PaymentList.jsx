@@ -10,6 +10,7 @@ import { paymentApi } from '../../api/paymentApi.js';
 import { customerApi } from '../../api/customerApi.js';
 import { supplierApi } from '../../api/supplierApi.js';
 import { saleApi } from '../../api/saleApi.js';
+import { purchaseApi } from '../../api/purchaseApi.js';
 import { calcLine } from '../../utils/gst.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { formatCurrency, formatDate } from '../../utils/format.js';
@@ -43,6 +44,7 @@ export default function PaymentList() {
   const { data: customers, reload: reloadCustomers } = useAsync(() => customerApi.list(), []);
   const { data: suppliers, reload: reloadSuppliers } = useAsync(() => supplierApi.list(), []);
   const { data: sales, reload: reloadSales } = useAsync(() => saleApi.list(), []);
+  const { data: purchases, reload: reloadPurchases } = useAsync(() => purchaseApi.list(), []);
 
   const [form, setForm] = useState({ partyType: 'Customer', partyId: '', invoiceId: '', amount: '', date: dayjs().format('YYYY-MM-DD'), mode: 'Cash', reference: '', remarks: '' });
   const [partyQuery, setPartyQuery] = useState('');
@@ -51,6 +53,7 @@ export default function PaymentList() {
     reloadCustomers();
     reloadSuppliers();
     reloadSales();
+    reloadPurchases();
     setPartyQuery('');
     setForm({ partyType: 'Customer', partyId: '', invoiceId: '', amount: '', date: dayjs().format('YYYY-MM-DD'), mode: 'Cash', reference: '', remarks: '' });
     setModalOpen(true);
@@ -105,12 +108,22 @@ export default function PaymentList() {
   }, [form.partyType, form.partyId, customers, suppliers]);
 
   const outstandingForInvoice = useMemo(() => {
-    if (!form.invoiceId || form.partyType !== 'Customer') return null;
-    const sale = sales?.find((s) => s.id === form.invoiceId);
-    if (!sale) return null;
-    const total = sale.lines.reduce((a, l) => a + calcLine(l).total, 0);
-    return total - (sale.amountReceived || 0);
-  }, [form.invoiceId, form.partyType, sales]);
+    if (!form.invoiceId) return null;
+    if (form.partyType === 'Customer') {
+      const sale = sales?.find((s) => s.id === form.invoiceId);
+      if (!sale) return null;
+      // Use server-authoritative balance field; fall back for legacy records
+      return sale.balance !== undefined && sale.balance !== null
+        ? Math.max(0, Number(sale.balance))
+        : Math.max(0, sale.lines.reduce((a, l) => a + calcLine(l).total, 0) - (sale.amountReceived || 0));
+    }
+    // Supplier invoice
+    const purchase = purchases?.find((p) => p.id === form.invoiceId);
+    if (!purchase) return null;
+    return purchase.balance !== undefined && purchase.balance !== null
+      ? Math.max(0, Number(purchase.balance))
+      : Math.max(0, (purchase.grandTotal || 0) - (purchase.amountPaid || 0));
+  }, [form.invoiceId, form.partyType, sales, purchases]);
 
   const [partyOutstanding, setPartyOutstanding] = useState(null);
   const [loadingOutstanding, setLoadingOutstanding] = useState(false);
@@ -178,6 +191,7 @@ export default function PaymentList() {
       reloadCustomers();
       reloadSuppliers();
       reloadSales();
+      reloadPurchases();
     } catch (err) {
       toast.error(err?.response?.data?.message || err?.message || 'Unable to record payment.');
     } finally {
@@ -318,10 +332,19 @@ export default function PaymentList() {
             {form.partyType === 'Customer' && (
               <FormField label="Invoice">
                 <select className="form-control" value={form.invoiceId} onChange={(e) => setForm((f) => ({ ...f, invoiceId: e.target.value }))}>
-                  <option value="">General payment / Advance receipt</option>
-                  {sales?.filter((s) => s.customerId === form.partyId).map((s) => <option key={s.id} value={s.id}>{s.invoiceNo}</option>)}
+                  <option value="">Auto-allocate FIFO across oldest unpaid invoices</option>
+                  {sales?.filter((s) => s.customerId === form.partyId && s.status !== 'Cancelled' && (s.balance > 0.5 || (!s.balance && (s.grandTotal - (s.amountReceived || 0)) > 0.5))).map((s) => <option key={s.id} value={s.id}>{s.invoiceNo} — {formatCurrency(s.balance ?? Math.max(0, s.grandTotal - (s.amountReceived || 0)))} due</option>)}
                 </select>
                 {outstandingForInvoice !== null && <span className="form-help">Outstanding on this invoice: {formatCurrency(outstandingForInvoice)}</span>}
+              </FormField>
+            )}
+            {form.partyType === 'Supplier' && (
+              <FormField label="Purchase Invoice">
+                <select className="form-control" value={form.invoiceId} onChange={(e) => setForm((f) => ({ ...f, invoiceId: e.target.value }))}>
+                  <option value="">Auto-allocate FIFO across oldest unpaid purchases</option>
+                  {purchases?.filter((p) => p.supplierId === form.partyId && p.status !== 'Cancelled' && (p.balance > 0.5 || (!p.balance && (p.grandTotal - (p.amountPaid || 0)) > 0.5))).map((p) => <option key={p.id} value={p.id}>{p.purchaseInvoiceNo} — {formatCurrency(p.balance ?? Math.max(0, p.grandTotal - (p.amountPaid || 0)))} due</option>)}
+                </select>
+                {outstandingForInvoice !== null && <span className="form-help">Outstanding on this purchase: {formatCurrency(outstandingForInvoice)}</span>}
               </FormField>
             )}
             <FormField label="Amount (₹)" required><input type="number" min="0" step="0.01" className="form-control" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} /></FormField>

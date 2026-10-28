@@ -1,0 +1,34 @@
+flowchart TD
+    Start([Sales Invoice Form]) --> SelectCust[Select Customer & Verify Outstanding]
+    SelectCust --> CheckInterState{Customer State == Company State?}
+    CheckInterState -->|Same State: 24 Gujarat| IntraState[Intra-State: CGST 50% + SGST 50%]
+    CheckInterState -->|Different State| InterState[Inter-State: IGST 100%]
+    
+    IntraState --> AddLines[Add Products, Batches, Rates, Quantities, Free Qty, Discounts]
+    InterState --> AddLines
+    
+    AddLines --> ValidateStock{Verify Batch Available Stock >= Qty + FreeQty}
+    ValidateStock -->|Insufficient Stock| ThrowStockErr[400 Insufficient Stock Error]
+    ValidateStock -->|Stock Sufficient| ExpiryPolicyCheck{Batch Expired?}
+    
+    ExpiryPolicyCheck -->|Expired & Policy=Block| BlockExpired[400 Expired Batch Blocked]
+    ExpiryPolicyCheck -->|Valid or Policy=Warn| CalcGST[Server-Side Recalculation: calcLine & calcDocumentTotals]
+    
+    CalcGST --> StartTx[Start MongoDB Transaction / Session]
+    StartTx --> GenInvNo[Atomic Next FY Invoice No: LLS/FY/SEQ via Counter.findOneAndUpdate]
+    GenInvNo --> DeductBatch[Deduct ProductBatch.currentQty by Qty + FreeQty]
+    DeductBatch --> RecordMovement[Write StockMovement: type=Sale, qty=-totalDeducted]
+    RecordMovement --> SyncProduct[Sync Product.currentStock = sum active batches]
+    SyncProduct --> PostLedger[Post CustomerLedger: debit=grandTotal, seq++, running balance]
+    PostLedger --> SaveSale[Save Sale Document with customer snapshot & line items]
+    SaveSale --> CommitTx[Commit Transaction]
+    
+    CommitTx --> Done[Invoice Created: Display Preview / Download PDF]
+    
+    Done -.-> CancelCheck{Cancel Requested?}
+    CancelCheck -->|Admin with Reason| CancelTx[Start Cancellation Transaction]
+    CancelTx --> RestoreBatch[Restore ProductBatch.currentQty by Qty + FreeQty]
+    RestoreBatch --> RecordRevMovement[Write StockMovement: type='Sale Cancellation', qty=+totalDeducted]
+    RecordRevMovement --> PostRevLedger[Post CustomerLedger: credit=grandTotal, seq++]
+    PostRevLedger --> UpdateStatus[Set Sale.status = 'Cancelled', cancelReason]
+    UpdateStatus --> CommitCancel[Commit Cancellation Transaction]

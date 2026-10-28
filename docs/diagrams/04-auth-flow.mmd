@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+    actor User as User / Admin
+    participant UI as Login Page (Login.jsx)
+    participant AuthCtx as AuthContext.jsx
+    participant API as /api/auth/login
+    participant Limiter as loginLimiter (10 req/15min)
+    participant Validator as auth.validator.js
+    participant UserDB as User Collection (MongoDB)
+    participant Storage as localStorage (auth_token)
+
+    User->>UI: Enters Email & Password
+    UI->>API: POST /api/auth/login { email, password }
+    API->>Limiter: Checks IP rate limit window
+    Limiter-->>UI: 429 Too Many Requests (if exceeded)
+    Limiter->>Validator: Validates email format & password presence
+    Validator-->>UI: 400 Validation Error (if empty/invalid)
+    Validator->>UserDB: User.findOne({ email }).select('+passwordHash')
+    UserDB-->>Validator: Returns user document (or null)
+    
+    alt User Not Found or Inactive
+        Validator-->>UI: 401 Unauthorized (Invalid credentials or inactive account)
+    else User Exists & Active
+        Validator->>Validator: bcrypt.compare(password, user.passwordHash)
+        alt Password Mismatch
+            Validator-->>UI: 401 Unauthorized (Invalid email or password)
+        else Password Valid
+            Validator->>Validator: jwt.sign({ sub: user._id, role: user.role }, secret, { expiresIn: '8h' })
+            Validator->>UserDB: Update user.lastLogin = Date.now()
+            Validator-->>API: 200 OK { token, user: { name, email, role } }
+            API-->>AuthCtx: Passes response data
+            AuthCtx->>Storage: Stores token & user in localStorage
+            AuthCtx->>UI: Dispatches window 'auth:login' event
+            UI-->>User: Navigates to /dashboard
+        end
+    end

@@ -1,0 +1,32 @@
+graph TD
+    subgraph Client["Client Browser / User Layer"]
+        User["Business Owner / Operator"]
+        ReactApp["React 18 SPA (Vite)<br/>React Router DOM, Axios, Context API<br/>Tailwind CSS & Lucide Icons"]
+    end
+
+    subgraph CDN["Frontend Hosting (Vercel)"]
+        VercelCDN["Vercel Edge Network / Static Build<br/>dist/ assets, index.html<br/>SPA Rewrite: /(.*) -> /index.html<br/>CSP & Security Headers"]
+    end
+
+    subgraph API["Backend Web Service (Render)"]
+        ExpressApp["Node.js 22 / Express 4 API Server<br/>REST Endpoints (/api/*)<br/>Helmet CSP, CORS, Morgan, MongoSanitize<br/>Rate Limiting (10 req/15 min login, 1000 req/15 min general)"]
+        AuthMiddleware["JWT Authentication & RBAC Middleware"]
+        Controllers["Controllers (Sales, Purchases, GST, Ledger, etc.)"]
+        Services["Business Logic Services (Stock, GST Math, Invoicing, Ledger)"]
+        DocEngine["Puppeteer + Chromium<br/>PDF Generation / ExcelJS / Docx"]
+        Jobs["Cron Scheduler<br/>Nightly DB Backup (03:00 IST)<br/>Data Retention Cleanup (02:00 IST)"]
+    end
+
+    subgraph DataLayer["Database Layer (MongoDB Atlas)"]
+        MongoAtlas["MongoDB Atlas Cluster (v7.0/v8.0)<br/>Replica Set with Distributed Transactions<br/>21 Mongoose Collections<br/>Atomic ID & FY Counter ($inc/upsert)"]
+    end
+
+    User -->|Interacts| ReactApp
+    ReactApp -->|Loaded via HTTPS| VercelCDN
+    ReactApp -->|API Calls (Bearer JWT)| ExpressApp
+    ExpressApp --> AuthMiddleware
+    AuthMiddleware --> Controllers
+    Controllers --> Services
+    Services --> DocEngine
+    Services -->|Mongoose Queries / Transactions| MongoAtlas
+    Jobs -->|Scheduled Execution| MongoAtlas

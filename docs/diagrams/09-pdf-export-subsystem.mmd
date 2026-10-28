@@ -1,0 +1,60 @@
+flowchart TD
+    subgraph ClientLayer["Frontend Client Actions"]
+        ExportActions["ExportActions.jsx / InvoiceActions.jsx"]
+        UserAction["User clicks: PDF / Excel / Word / CSV"]
+    end
+
+    subgraph RouterLayer["Express Router Layer"]
+        ExportRoute["/api/exports/:report/:format<br/>format: pdf | xlsx | docx | csv"]
+        PdfRoute["/api/sales/:id/pdf<br/>/api/purchases/:id/pdf<br/>/api/pdf/*"]
+    end
+
+    subgraph ServiceLayer["Document Generation Services"]
+        ReportRows["reportRows.service.js<br/>Fetches & normalizes report records"]
+        GstReportService["gstReport.service.js<br/>Computes statutory data"]
+        PdfService["pdf.service.js<br/>Puppeteer HTML to PDF engine"]
+        ExcelService["export.service.js (exceljs)<br/>Styled Worksheets & Formulas"]
+        DocxService["export.service.js (docx)<br/>Word Document Tables & Headings"]
+    end
+
+    subgraph Templates["HTML / PDF Templates"]
+        InvTemplate["invoice.html.js<br/>Sales Bill with Free column, HSN, DL, Bank"]
+        Gstr3bTemplate["gstr3b.html.js<br/>Portrait Statutory Form GSTR-3B"]
+        ReportTemplate["reportTable.html.js<br/>Grouped Landscape Reports with Subtotals"]
+        LedgerTemplate["ledger.html.js<br/>Running Balance Statement"]
+        ReceiptTemplate["paymentReceipt.html.js<br/>Voucher Receipt"]
+    end
+
+    subgraph Engine["Chromium Engine"]
+        Puppeteer["Puppeteer + Chromium Browser<br/>@sparticuz/chromium (Linux/Render)<br/>System Chrome / Edge (Windows/Local)"]
+    end
+
+    subgraph ResponseHandling["Binary Response & Delivery"]
+        HttpStream["HTTP 200 Binary Stream<br/>Content-Type: application/pdf | application/vnd.openxml...<br/>Content-Disposition: inline or attachment"]
+        BlobUrl["Frontend: window.URL.createObjectURL(blob)<br/>Direct Chrome Preview Tab or Instant Download"]
+    end
+
+    UserAction --> ExportActions
+    ExportActions -->|HTTP GET with format| ExportRoute
+    ExportActions -->|HTTP GET for Invoices| PdfRoute
+    
+    ExportRoute -->|format=xlsx| ExcelService --> HttpStream
+    ExportRoute -->|format=docx| DocxService --> HttpStream
+    ExportRoute -->|format=csv| ReportRows --> HttpStream
+    ExportRoute -->|format=pdf| PdfService
+    PdfRoute --> PdfService
+    
+    PdfService --> InvTemplate
+    PdfService --> Gstr3bTemplate
+    PdfService --> ReportTemplate
+    PdfService --> LedgerTemplate
+    PdfService --> ReceiptTemplate
+    
+    InvTemplate --> Puppeteer
+    Gstr3bTemplate --> Puppeteer
+    ReportTemplate --> Puppeteer
+    LedgerTemplate --> Puppeteer
+    ReceiptTemplate --> Puppeteer
+    
+    Puppeteer -->|Binary PDF Buffer (%PDF-)| HttpStream
+    HttpStream --> BlobUrl

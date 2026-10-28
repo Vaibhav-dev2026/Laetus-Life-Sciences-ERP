@@ -1,0 +1,32 @@
+flowchart TD
+    subgraph SourceTransactions["Operational Transactions"]
+        SalesDocs["Sales Invoices (Sale Collection)<br/>Active status only<br/>Includes Inter-State & Intra-State"]
+        SalesReturns["Sales Returns (SalesReturn Collection)<br/>Credit Notes (CDNR)"]
+        PurchasesDocs["Purchase Bills (Purchase Collection)<br/>Active status only<br/>Supplier GSTIN & Inward Taxes"]
+        PurchaseReturns["Purchase Returns (PurchaseReturn Collection)<br/>Debit Notes"]
+    end
+
+    subgraph GSTComputationEngine["GST Report Engine (gstReport.service.js)"]
+        GSTR1_Engine["GSTR-1 Outward Supply Builder<br/>- B2B Table: Registered Customers with GSTIN<br/>- B2CL Table: Inter-State Unregistered > Rs 2.5L<br/>- B2CS Table: Retail Intra-State / Small Inter-State<br/>- CDNR Table: Sales Return Credit Notes<br/>- HSN Table: Aggregated by HSN code & tax slab"]
+        
+        GSTR2B_Engine["ITC & GSTR-2B Reconciliation Builder<br/>- Compares Purchase records with GSTR-2B JSON import<br/>- Status: Matched / In Books Only / In Portal Only<br/>- Computes Eligible vs Ineligible ITC"]
+        
+        GSTR3B_Engine["GSTR-3B Statutory Summary Builder<br/>- Section 3.1: Outward taxable supplies & tax payable<br/>- Section 3.2: Inter-state supplies to unregistered<br/>- Section 4: Eligible ITC Available minus Reversed ITC<br/>- Section 5: Exempt/Nil-rated inward supplies<br/>- Section 6.1: Payment of Tax (Cash = Output Tax - Net ITC)"]
+    end
+
+    subgraph Outputs["Statutory Return Outputs"]
+        GSTR1_View["GSTR1.jsx (Interactive UI)<br/>+ PDF / Excel / Word / CSV Exports"]
+        ITC_View["ITCReconciliation.jsx (UI)<br/>+ Excel / CSV Exports"]
+        GSTR3B_View["GSTR3B.jsx (UI)<br/>+ Dedicated Statutory Portrait PDF (gstr3b.html.js)"]
+    end
+
+    SalesDocs --> GSTR1_Engine
+    SalesReturns --> GSTR1_Engine
+    PurchasesDocs --> GSTR2B_Engine
+    PurchasesDocs --> GSTR3B_Engine
+    PurchaseReturns --> GSTR3B_Engine
+    GSTR1_Engine --> GSTR3B_Engine
+    
+    GSTR1_Engine --> GSTR1_View
+    GSTR2B_Engine --> ITC_View
+    GSTR3B_Engine --> GSTR3B_View

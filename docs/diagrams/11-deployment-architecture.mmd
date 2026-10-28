@@ -1,0 +1,30 @@
+graph TB
+    subgraph InternetUsers["Public Internet / Authorized Operators"]
+        Operator["Vaibhav Tiwari & Premchandra Tiwari<br/>Secure Browser Access"]
+    end
+
+    subgraph GitHubRepo["Source Control (GitHub)"]
+        GitHub["GitHub: Vaibhav-dev2026/Laetus-Life-Sciences-ERP<br/>Branch: main (CI/CD Deployment Triggers)"]
+    end
+
+    subgraph VercelFrontend["Frontend Production Environment (Vercel)"]
+        VercelCDN["Vercel Edge Global CDN<br/>URL: https://laetus-life-sciences-erp-d8xm.vercel.app<br/>SPA Rewrites to /index.html<br/>Strict Content Security Policy & Security Headers"]
+        ViteBuild["Production Bundle (Vite)<br/>React 18 SPA + Assets"]
+    end
+
+    subgraph RenderBackend["Backend Production Environment (Render)"]
+        RenderService["Render Web Service: laetus-erp-backend<br/>URL: https://laetus-erp-backend.onrender.com<br/>Node.js 22 Runtime on Linux Container<br/>@sparticuz/chromium Binary for Puppeteer<br/>Host Binding: 0.0.0.0:PORT"]
+        CronWorkers["In-Process Scheduled Jobs (node-cron)<br/>Nightly DB Backup (03:00 IST)<br/>Data Retention Cleanup (02:00 IST)"]
+    end
+
+    subgraph MongoDBAtlas["Database Cluster (MongoDB Atlas)"]
+        AtlasCluster["MongoDB Atlas Cloud Database (v7.0/v8.0)<br/>Replica Set Architecture (Primary + Secondary Nodes)<br/>ACID Multi-Document Distributed Transactions<br/>Automated Point-in-Time Backups & High Availability"]
+    end
+
+    GitHub -->|Auto-Deploy on Push to main| VercelFrontend
+    GitHub -->|Auto-Deploy on Push to main (render.yaml)| RenderBackend
+    Operator -->|HTTPS Traffic| VercelCDN
+    VercelCDN --> ViteBuild
+    ViteBuild -->|REST API over TLS (Bearer JWT)| RenderService
+    RenderService -->|Mongoose Connection String + TLS| AtlasCluster
+    CronWorkers -->|Nightly Maintenance| AtlasCluster

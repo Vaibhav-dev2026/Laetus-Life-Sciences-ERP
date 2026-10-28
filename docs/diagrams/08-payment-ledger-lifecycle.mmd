@@ -1,0 +1,28 @@
+flowchart TD
+    Start([Payment Entry Form]) --> SelectParty[Select Party Type: Customer or Supplier]
+    SelectParty --> SelectPartyRecord[Select Customer/Supplier Record & Load Outstanding]
+    SelectPartyRecord --> EnterDetails[Enter Payment Date, Amount, Mode: Cash/UPI/Bank/Cheque, Ref]
+    
+    EnterDetails --> OverpaymentCheck{Amount > Current Balance?}
+    OverpaymentCheck -->|Customer: Amount > Outstanding| RejectOverpay[Reject 400: Overpayment not allowed]
+    OverpaymentCheck -->|Valid Amount| StartTx[Start Transaction / Session]
+    
+    StartTx --> GenPayId[Generate Payment ID: PAY-000001]
+    GenPayId --> CheckPartyType{Party Type?}
+    
+    CheckPartyType -->|Customer Receipt| CustomerBranch[Apply to Customer]
+    CustomerBranch --> AllocSale[Allocate Amount against Oldest Unpaid Invoices FIFO]
+    AllocSale --> UpdateSaleBalance[Update Sale.amountReceived += alloc, balance -= alloc, paymentStatus]
+    UpdateSaleBalance --> PostCustLedger[Post CustomerLedger: credit=amount, seq++, running balance]
+    PostCustLedger --> UpdateCustBalance[Update Customer.currentBalance -= amount]
+    
+    CheckPartyType -->|Supplier Payment| SupplierBranch[Apply to Supplier]
+    SupplierBranch --> AllocPur[Allocate Amount against Oldest Unpaid Purchases FIFO]
+    AllocPur --> UpdatePurBalance[Update Purchase.amountPaid += alloc, balance -= alloc, paymentStatus]
+    UpdatePurBalance --> PostSuppLedger[Post SupplierLedger: debit=amount, seq++, running balance]
+    PostSuppLedger --> UpdateSuppBalance[Update Supplier.currentPayable -= amount]
+    
+    UpdateCustBalance --> SavePay[Save Payment Document]
+    UpdateSuppBalance --> SavePay
+    SavePay --> CommitTx[Commit Transaction]
+    CommitTx --> Done[Payment Recorded: Print/Download Payment Receipt PDF]

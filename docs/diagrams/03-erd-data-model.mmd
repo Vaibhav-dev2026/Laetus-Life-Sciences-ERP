@@ -1,0 +1,131 @@
+erDiagram
+    COMPANY ||--o{ USER : "authorizes"
+    USER ||--o{ AUDIT_LOG : "generates"
+    USER ||--o{ SALE : "records"
+    USER ||--o{ PURCHASE : "records"
+    
+    CUSTOMER ||--o{ SALE : "places"
+    CUSTOMER ||--o{ CUSTOMER_LEDGER : "has entries in"
+    CUSTOMER ||--o{ PAYMENT : "makes"
+    CUSTOMER ||--o{ SALES_RETURN : "receives credit note"
+    
+    SUPPLIER ||--o{ PURCHASE : "supplies"
+    SUPPLIER ||--o{ SUPPLIER_LEDGER : "has entries in"
+    SUPPLIER ||--o{ PAYMENT : "receives"
+    SUPPLIER ||--o{ PURCHASE_RETURN : "receives debit note"
+    SUPPLIER ||--o{ PRODUCT_BATCH : "supplies batches"
+    
+    PRODUCT ||--|{ PRODUCT_BATCH : "has active batches"
+    PRODUCT ||--o{ STOCK_MOVEMENT : "tracked via"
+    
+    PRODUCT_BATCH ||--o{ STOCK_MOVEMENT : "tracked via"
+    
+    SALE ||--|{ SALE_LINE : "contains"
+    SALE ||--o{ CUSTOMER_LEDGER : "creates debit"
+    SALE ||--o{ SALES_RETURN : "returned in"
+    SALE ||--o{ PAYMENT : "allocated by"
+    
+    PURCHASE ||--|{ PURCHASE_LINE : "contains"
+    PURCHASE ||--o{ SUPPLIER_LEDGER : "creates credit"
+    PURCHASE ||--o{ PURCHASE_RETURN : "returned in"
+    PURCHASE ||--o{ PAYMENT : "allocated by"
+    
+    CUSTOMER {
+        string id PK "CUST-000001"
+        string partyName
+        string gstin
+        string stateCode "24"
+        number currentBalance
+        string status "Active|Inactive"
+    }
+    
+    SUPPLIER {
+        string id PK "SUPP-000001"
+        string company
+        string gstin
+        string stateCode "24"
+        number currentPayable
+        string status "Active|Inactive"
+    }
+    
+    PRODUCT {
+        string id PK "PRD-000001"
+        string sku UK
+        string name
+        string hsn
+        number gstRate
+        number mrp
+        number saleRate
+        number currentStock
+    }
+    
+    PRODUCT_BATCH {
+        string id PK "BAT-000001"
+        string productId FK
+        string batchNo
+        date expDate
+        number currentQty
+        number mrp
+        number saleRate
+        string status "Healthy|Near Expiry|Expired|Out of Stock"
+    }
+    
+    SALE {
+        string id PK "INV-000001"
+        string invoiceNo UK "LLS/26-27/000001"
+        string customerId FK
+        date date
+        boolean isInterState
+        number grossTotal
+        number taxableTotal
+        number cgstTotal
+        number sgstTotal
+        number igstTotal
+        number grandTotal
+        number balance
+        string paymentStatus
+        string status "Active|Cancelled"
+    }
+    
+    PURCHASE {
+        string id PK "PUR-000001"
+        string purchaseInvoiceNo
+        string supplierId FK
+        string supplierInvoiceNo
+        date purchaseDate
+        number grossTotal
+        number taxableTotal
+        number grandTotal
+        number amountPaid
+        string status "Active|Cancelled"
+    }
+    
+    STOCK_MOVEMENT {
+        string productId FK
+        string batchId FK
+        string type "Purchase|Sale|SalesReturn|PurchaseReturn|Adjustment"
+        number qty "+/- delta"
+        number balanceAfter
+        date date
+        string refId
+    }
+    
+    CUSTOMER_LEDGER {
+        string partyId FK
+        date date
+        string type "Opening|Sale|Payment|Return|Adjustment|Cancellation"
+        number debit
+        number credit
+        number balance
+        number seq
+    }
+    
+    SUPPLIER_LEDGER {
+        string partyId FK
+        date date
+        string type "Opening|Purchase|Payment|Return|Adjustment|Cancellation"
+        number debit
+        number credit
+        number balance
+        number seq
+    }

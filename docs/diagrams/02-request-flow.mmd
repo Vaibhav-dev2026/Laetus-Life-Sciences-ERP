@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    actor User as User / Operator
+    participant UI as React 18 UI Component
+    participant Axios as Axios / API Client (client.js)
+    participant RateLimit as Express Rate Limiter
+    participant Security as Helmet & MongoSanitize
+    participant Auth as JWT Auth Middleware
+    participant Validator as Express-Validator
+    participant Ctrl as Controller
+    participant Svc as Business Service
+    participant Model as Mongoose Model / MongoDB
+
+    User->>UI: Submits Form / Action
+    UI->>Axios: Dispatches API Request (with x-idempotency-key)
+    Axios->>RateLimit: HTTP Request (Headers + Body)
+    RateLimit-->>Axios: 429 Too Many Requests (if exceeded)
+    RateLimit->>Security: Sanitizes input & verifies origin
+    Security->>Auth: Verifies Authorization: Bearer <token>
+    Auth-->>Axios: 401 Unauthorized (if missing/expired)
+    Auth->>Validator: Validates schema & parameters
+    Validator-->>Axios: 400 Bad Request (if validation fails)
+    Validator->>Ctrl: Hands off validated & sanitized data
+    Ctrl->>Svc: Invokes business logic & calculations
+    Svc->>Model: Queries / Transactions (Atomic Session)
+    Model-->>Svc: Persisted Documents / State
+    Svc-->>Ctrl: Processed Output / Aggregate
+    Ctrl-->>Axios: HTTP 200/201 JSON / Stream (PDF/XLSX)
+    Axios-->>UI: Resolves Promise with ApiResponse payload
+    UI-->>User: Updates React State / Triggers Toast / Renders View
