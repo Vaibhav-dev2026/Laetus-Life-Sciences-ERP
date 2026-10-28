@@ -20,6 +20,7 @@ const customerSchema = new mongoose.Schema({
   paymentTerms: { type: String, default: '30 Days' },
   creditLimit: { type: Number, default: 0 },
   openingOutstanding: { type: Number, default: 0 },
+  currentBalance: { type: Number, default: 0 },
   notes: { type: String, default: '' },
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
 }, { timestamps: true });

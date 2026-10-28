@@ -17,19 +17,29 @@ async function outstandingRows(query = {}) {
     if (query.to) filter.date.$lte = query.to;
   }
 
-  const sales = await Sale.find(filter).sort({ customerId: 1, date: 1 });
-  const customers = await Customer.find({ id: { $in: sales.map((s) => s.customerId) } });
-  const map = new Map(customers.map((c) => [c.id, c.partyName]));
+  const [sales, allCusts] = await Promise.all([
+    Sale.find(filter).sort({ customerId: 1, date: 1 }),
+    Customer.find(query.customerId ? { id: query.customerId, status: 'Active' } : { status: 'Active' }),
+  ]);
+
+  const map = new Map(allCusts.map((c) => [c.id, c.partyName]));
+
+  // Calculate sum of active sale balances per customer
+  const salesBalanceByCust = {};
+  sales.forEach((s) => {
+    salesBalanceByCust[s.customerId] = round2((salesBalanceByCust[s.customerId] || 0) + (s.balance || 0));
+  });
 
   const partyCumulative = {};
   const today = dayjs();
+  const rows = [];
 
-  const rows = sales.map((s) => {
+  for (const s of sales) {
     const bal = round2(s.balance || Math.max(0, (s.grandTotal || 0) - (s.amountReceived || 0)));
     partyCumulative[s.customerId] = round2((partyCumulative[s.customerId] || 0) + bal);
     const dueDate = s.dueDate || s.date;
     const daysOverdue = Math.max(0, today.diff(dayjs(dueDate), 'day'));
-    return {
+    rows.push({
       partyName: map.get(s.customerId) || s.customerId,
       billNo: s.invoiceNo,
       billDate: dayjs(s.date).format('DD-MM-YYYY'),
@@ -41,7 +51,43 @@ async function outstandingRows(query = {}) {
       daysOverdue,
       pdc: '0',
       remark: s.paymentStatus || s.status,
-    };
+    });
+  }
+
+  // Include customers with remaining opening balance
+  for (const c of allCusts) {
+    if ((c.openingOutstanding || 0) > 0.5) {
+      const activeSalesBal = salesBalanceByCust[c.id] || 0;
+      const currentLedger = c.currentBalance && c.currentBalance > 0
+        ? c.currentBalance
+        : (c.openingOutstanding || 0);
+      const remainingOpening = round2(Math.max(0, currentLedger - activeSalesBal));
+
+      if (remainingOpening > 0.5) {
+        partyCumulative[c.id] = round2((partyCumulative[c.id] || 0) + remainingOpening);
+        const createdDate = c.createdAt || new Date();
+        const daysOverdue = Math.max(0, today.diff(dayjs(createdDate), 'day'));
+        rows.push({
+          partyName: c.partyName,
+          billNo: 'OPENING',
+          billDate: dayjs(createdDate).format('DD-MM-YYYY'),
+          billAmount: round2(c.openingOutstanding),
+          received: round2(Math.max(0, c.openingOutstanding - remainingOpening)),
+          balance: remainingOpening,
+          cumulativeTotal: partyCumulative[c.id],
+          dueDate: '-',
+          daysOverdue,
+          pdc: '0',
+          remark: 'Opening Balance',
+        });
+      }
+    }
+  }
+
+  rows.sort((a, b) => {
+    const c = (a.partyName || '').localeCompare(b.partyName || '');
+    if (c !== 0) return c;
+    return (a.billNo || '').localeCompare(b.billNo || '');
   });
 
   const columns = [

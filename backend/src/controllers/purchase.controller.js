@@ -221,6 +221,10 @@ const update = asyncHandler(async (req, res) => {
   const supplier = await Supplier.findOne({ $or: [{ id: supplierId }, ...(require('mongoose').Types.ObjectId.isValid(supplierId) ? [{ _id: supplierId }] : [])] });
   if (!supplier) throw ApiError.notFound('Supplier not found');
 
+  if (supplierId !== purchase.supplierId && (purchase.amountPaid || 0) > 0) {
+    throw ApiError.badRequest('Cannot change supplier on a purchase invoice that already has payment recorded. Please adjust or reverse payment first.');
+  }
+
   const productIds = lines.map((l) => l.productId).filter(Boolean);
   const products = await Product.find({ id: { $in: productIds } });
   const productMap = new Map(products.map((p) => [p.id, p]));
@@ -352,7 +356,7 @@ const update = asyncHandler(async (req, res) => {
     purchase.igstTotal = totals.igstTotal;
     purchase.grandTotal = totals.grandTotal;
     purchase.amountPaid = effectiveAmountPaid;
-    purchase.balance = round2(totals.grandTotal - effectiveAmountPaid);
+    purchase.balance = round2(Math.max(0, totals.grandTotal - effectiveAmountPaid));
     purchase.paymentStatus = effectivePaymentStatus;
 
     await purchase.save(opts);

@@ -36,6 +36,7 @@ async function postCustomerEntry({ partyId, date, type, refId, refNo, debit = 0,
   const balance = round2(prevBalance + debit - credit);
   const opts = session ? { session } : {};
   const [entry] = await CustomerLedger.create([{ partyId, date, type, refId, refNo, debit, credit, balance }], opts);
+  await Customer.updateOne({ id: partyId }, { $set: { currentBalance: balance } }, opts);
   return entry;
 }
 
@@ -65,6 +66,7 @@ async function postSupplierEntry({ partyId, date, type, refId, refNo, debit = 0,
   const balance = round2(prevBalance + credit - debit);
   const opts = session ? { session } : {};
   const [entry] = await SupplierLedger.create([{ partyId, date, type, refId, refNo, debit, credit, balance }], opts);
+  await Supplier.updateOne({ id: partyId }, { $set: { currentPayable: balance } }, opts);
   return entry;
 }
 

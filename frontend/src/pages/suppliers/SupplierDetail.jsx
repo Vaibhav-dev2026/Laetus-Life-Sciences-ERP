@@ -38,7 +38,7 @@ export default function SupplierDetail() {
 
       <div className="stat-grid mb-6">
         <StatCard label="Total Purchases" value={formatCurrency(totalPurchase)} icon="🧾" />
-        <StatCard label="Payable" value={formatCurrency(supplier.openingPayable)} icon="📕" />
+        <StatCard label="Payable" value={formatCurrency(supplier.currentPayable !== undefined && supplier.currentPayable !== null ? supplier.currentPayable : (supplier.openingPayable || 0))} icon="📕" />
         <StatCard label="Purchase Orders" value={supPurchases.length} icon="📦" />
         <StatCard label="Status" value={<StatusBadge status={supplier.status} />} icon="●" />
       </div>

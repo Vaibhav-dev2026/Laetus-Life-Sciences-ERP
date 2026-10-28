@@ -43,7 +43,7 @@ export default function SupplierList() {
     { key: 'contact', label: 'Contact' },
     { key: 'mobile', label: 'Mobile' },
     { key: 'gstin', label: 'GSTIN', className: 'mono' },
-    { key: 'openingPayable', label: 'Payable', align: 'right', sortable: true, render: (r) => formatCurrency(r.openingPayable) },
+    { key: 'currentPayable', label: 'Payable', align: 'right', sortable: true, render: (r) => formatCurrency(r.currentPayable !== undefined && r.currentPayable !== null ? r.currentPayable : (r.openingPayable || 0)) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'actions', label: '', render: (r) => (
       <RowActions onView={() => navigate(`/suppliers/${r.id}`)} onEdit={() => navigate(`/suppliers/${r.id}/edit`)}

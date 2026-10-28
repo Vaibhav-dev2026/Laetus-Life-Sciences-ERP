@@ -29,17 +29,18 @@ export default function CustomerDetail() {
   const custSales = (sales || []).filter((s) => s.customerId === id);
   const custPayments = (payments || []).filter((p) => p.partyId === id);
   const totalSales = custSales.reduce((a, s) => a + s.lines.reduce((x, l) => x + calcLine(l).total, 0), 0);
-  // Use Sale.balance (the server-authoritative field, kept in sync by payment controller)
-  // rather than re-deriving from grandTotal - amountReceived client-side.
-  // Fall back to (grandTotal - amountReceived) for legacy records that pre-date this field.
-  const outstanding = custSales
-    .filter((s) => s.status !== 'Cancelled')
-    .reduce((a, s) => {
-      const bal = s.balance !== undefined && s.balance !== null
-        ? Number(s.balance)
-        : Math.max(0, (s.grandTotal || 0) - Number(s.amountReceived || 0));
-      return a + bal;
-    }, 0) + Number(customer.openingOutstanding || 0);
+  // Use customer.currentBalance (authoritative ledger-closing balance from backend).
+  // Fall back to summing active invoice balances + opening balance if not yet loaded.
+  const outstanding = customer.currentBalance !== undefined && customer.currentBalance !== null
+    ? Number(customer.currentBalance)
+    : custSales
+        .filter((s) => s.status !== 'Cancelled')
+        .reduce((a, s) => {
+          const bal = s.balance !== undefined && s.balance !== null
+            ? Number(s.balance)
+            : Math.max(0, (s.grandTotal || 0) - Number(s.amountReceived || 0));
+          return a + bal;
+        }, 0) + Number(customer.openingOutstanding || 0);
 
   return (
     <div className="page-body">

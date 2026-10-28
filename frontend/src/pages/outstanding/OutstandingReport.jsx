@@ -55,7 +55,7 @@ export default function OutstandingReport() {
     const partyCumulative = {};
     const today = dayjs().format('YYYY-MM-DD');
 
-    return sorted.map((s) => {
+    const salesRows = sorted.map((s) => {
       const customer = customerMap.get(s.customerId);
       const billAmount = s.grandTotal || 0;
       const received = Number(s.amountReceived || 0);
@@ -93,6 +93,55 @@ export default function OutstandingReport() {
         remark: s.paymentStatus || s.status,
       };
     }).filter((r) => r.balance > 0.5);
+
+    // Sum active sale balances per customer
+    const salesBalByCust = {};
+    salesRows.forEach((r) => {
+      salesBalByCust[r.customerId] = (salesBalByCust[r.customerId] || 0) + r.balance;
+    });
+
+    // Include customers who have remaining opening balance debt
+    const openingRows = [];
+    customers.forEach((c) => {
+      if (Number(c.openingOutstanding || 0) > 0.5) {
+        const activeSalesBal = salesBalByCust[c.id] || 0;
+        const currentLedger = c.currentBalance && Number(c.currentBalance) > 0
+          ? Number(c.currentBalance)
+          : Number(c.openingOutstanding || 0);
+        const remainingOpening = Math.max(0, currentLedger - activeSalesBal);
+
+        if (remainingOpening > 0.5) {
+          partyCumulative[c.id] = (partyCumulative[c.id] || 0) + remainingOpening;
+          const createdDate = c.createdAt ? dayjs(c.createdAt).format('YYYY-MM-DD') : today;
+          const daysOverdue = Math.max(0, daysBetween(createdDate, today));
+          openingRows.push({
+            id: `OPEN-${c.id}`,
+            customerId: c.id,
+            partyName: c.partyName,
+            billNo: 'OPENING',
+            billDate: createdDate,
+            billAmount: Number(c.openingOutstanding),
+            received: Math.max(0, Number(c.openingOutstanding) - remainingOpening),
+            balance: remainingOpening,
+            cumulativeTotal: partyCumulative[c.id],
+            dueDate: '-',
+            daysOverdue,
+            bucket: '90+',
+            pdc: '0',
+            remark: 'Opening Balance',
+          });
+        }
+      }
+    });
+
+    const all = [...salesRows, ...openingRows];
+    all.sort((a, b) => {
+      const c = (a.partyName || '').localeCompare(b.partyName || '');
+      if (c !== 0) return c;
+      return (a.billDate || '').localeCompare(b.billDate || '');
+    });
+
+    return all;
   }, [sales, customers]);
 
   const filtered = useMemo(() => {

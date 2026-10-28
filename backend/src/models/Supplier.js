@@ -16,6 +16,7 @@ const supplierSchema = new mongoose.Schema({
   drugLicence: { type: String, default: '' },
   paymentTerms: { type: String, default: '30 Days' },
   openingPayable: { type: Number, default: 0 },
+  currentPayable: { type: Number, default: 0 },
   bankName: { type: String, default: '' },
   accountNumber: { type: String, default: '' },
   ifsc: { type: String, default: '' },

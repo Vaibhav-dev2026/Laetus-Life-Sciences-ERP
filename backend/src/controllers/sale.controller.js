@@ -186,6 +186,10 @@ const update = asyncHandler(async (req, res) => {
   const customer = await Customer.findOne({ $or: [{ id: customerId }, ...(isCustObjId ? [{ _id: customerId }] : [])] });
   if (!customer) throw ApiError.notFound('Customer not found');
 
+  if (customerId !== sale.customerId && (sale.amountReceived || 0) > 0) {
+    throw ApiError.badRequest('Cannot change customer on an invoice that already has payment received. Please adjust or reverse payment first.');
+  }
+
   const company = (await Company.findOne()) || { stateCode: '24', invoice: { numberFormat: 'LLS/{FY}/{SEQ}', expiryPolicy: 'Warn' } };
   const interState = isInterState(company.stateCode, customer.stateCode);
 
@@ -243,7 +247,7 @@ const update = asyncHandler(async (req, res) => {
   const totals = calcDocumentTotals(computedLines);
 
   const newAmountReceived = amountReceived !== undefined ? Number(amountReceived) : sale.amountReceived;
-  const newBalance = round2(totals.grandTotal - newAmountReceived);
+  const newBalance = round2(Math.max(0, totals.grandTotal - newAmountReceived));
   const paymentStatus = newBalance <= 0 ? 'Paid' : newAmountReceived > 0 ? 'Partial' : 'Unpaid';
 
   const updatedSale = await withTransaction(async (session) => {

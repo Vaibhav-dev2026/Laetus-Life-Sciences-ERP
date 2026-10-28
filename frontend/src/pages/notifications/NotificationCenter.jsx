@@ -9,7 +9,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { formatDateTime } from '../../utils/format.js';
 import { usePageTitle } from '../../context/PageTitleContext.jsx';
 
-const TYPE_ICON = { 'Low Stock': '📉', 'Near Expiry': '⏳', Expired: '⛔', 'Outstanding Overdue': '📋', 'Purchase Created': '🧾', 'Sales Created': '🧮', 'Payment Received': '💳', 'System Alert': '⚙️' };
+const TYPE_ICON = { 'Low Stock': '📉', 'Out of Stock': '🚨', 'Near Expiry': '⏳', Expired: '⛔', 'Outstanding Overdue': '📋', 'Purchase Created': '🧾', 'Sales Created': '🧮', 'Payment Received': '💳', 'System Alert': '⚙️' };
 
 export default function NotificationCenter() {
   usePageTitle('Notifications');

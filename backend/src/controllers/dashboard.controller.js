@@ -1,13 +1,11 @@
 const dayjs = require('dayjs');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
-const { Sale, Purchase, Product, ProductBatch, Customer, Supplier } = require('../models');
+const { Sale, Purchase, Product, ProductBatch, Customer, Supplier, SalesReturn } = require('../models');
 const { round2 } = require('../utils/money');
 const { buildDateQuery } = require('../utils/dateRange.util');
 
-// All dashboard numbers are computed via MongoDB aggregation — the frontend
-// never receives raw Sale/Purchase collections to sum client-side.
-
+// All dashboard numbers are computed via authoritative MongoDB aggregations
 const summary = asyncHandler(async (req, res) => {
   const fromParam = req.query.from || req.query.startDate;
   const toParam = req.query.to || req.query.endDate;
@@ -18,59 +16,108 @@ const summary = asyncHandler(async (req, res) => {
   const startOfToday = dayjs().startOf('day').toDate();
   const endOfToday = dayjs().endOf('day').toDate();
 
-  const saleMatch = { status: 'Active', ...(customDateRange ? { date: customDateRange } : {}) };
-  const purchaseMatch = { status: 'Active', ...(customDateRange ? { purchaseDate: customDateRange } : {}) };
+  const startOfMonth = dayjs().startOf('month').toDate();
+  const endOfMonth = dayjs().endOf('month').toDate();
 
+  // 1. Sales Today: strictly current calendar day
   const [todaySalesAgg] = await Sale.aggregate([
     { $match: { status: 'Active', date: { $gte: startOfToday, $lte: endOfToday } } },
     { $group: { _id: null, total: { $sum: '$grandTotal' } } },
   ]);
 
+  // 2. Monthly Sales: current calendar month (or custom date range if selected)
+  const monthSaleDateMatch = customDateRange || { $gte: startOfMonth, $lte: endOfMonth };
   const [monthlySalesAgg] = await Sale.aggregate([
-    { $match: saleMatch },
+    { $match: { status: 'Active', date: monthSaleDateMatch } },
     { $group: { _id: null, total: { $sum: '$grandTotal' } } },
   ]);
 
+  // 3. Purchase Today: strictly current calendar day
   const [todayPurchaseAgg] = await Purchase.aggregate([
-    { $match: purchaseMatch },
+    { $match: { status: 'Active', purchaseDate: { $gte: startOfToday, $lte: endOfToday } } },
     { $group: { _id: null, total: { $sum: '$grandTotal' } } },
   ]);
 
+  // Total Purchases (all-time active)
+  const [totalPurchasesAgg] = await Purchase.aggregate([
+    { $match: { status: 'Active' } },
+    { $group: { _id: null, total: { $sum: '$grandTotal' } } },
+  ]);
+
+  // 4. Outstanding Receivable: open invoices + remaining opening balances
   const [outstandingAgg] = await Sale.aggregate([
     { $match: { status: 'Active', balance: { $gt: 0 } } },
     { $group: { _id: null, total: { $sum: '$balance' } } },
   ]);
 
+  const [customerBalAgg] = await Customer.aggregate([
+    { $match: { status: 'Active', currentBalance: { $gt: 0 } } },
+    { $group: { _id: null, total: { $sum: '$currentBalance' } } },
+  ]);
+
+  const totalOutstandingReceivable = round2(
+    Math.max(outstandingAgg?.total || 0, customerBalAgg?.total || 0)
+  );
+
+  // 5. Supplier Payable: open purchase balances + remaining opening payables
   const [purchasePayableAgg] = await Purchase.aggregate([
     { $match: { status: 'Active', balance: { $gt: 0 } } },
     { $group: { _id: null, total: { $sum: '$balance' } } },
   ]);
 
+  const [supplierBalAgg] = await Supplier.aggregate([
+    { $match: { status: 'Active', currentPayable: { $gt: 0 } } },
+    { $group: { _id: null, total: { $sum: '$currentPayable' } } },
+  ]);
+
   const [payableAgg] = await Supplier.aggregate([
+    { $match: { status: 'Active' } },
     { $group: { _id: null, total: { $sum: '$openingPayable' } } },
   ]);
 
-  const totalSupplierPayable = round2((payableAgg?.total || 0) + (purchasePayableAgg?.total || 0));
+  const totalSupplierPayable = round2(
+    Math.max(
+      (payableAgg?.total || 0) + (purchasePayableAgg?.total || 0),
+      supplierBalAgg?.total || 0
+    )
+  );
 
+  // 6. Inventory metrics
   const [stockValueAgg] = await ProductBatch.aggregate([
     { $group: { _id: null, total: { $sum: { $multiply: ['$currentQty', '$purchaseRate'] } } } },
   ]);
 
-  const lowStock = await Product.countDocuments({ $expr: { $lte: ['$currentStock', '$reorderLevel'] } });
+  const lowStock = await Product.countDocuments({
+    status: 'Active',
+    $expr: {
+      $and: [
+        { $gt: ['$currentStock', 0] },
+        { $lte: ['$currentStock', { $ifNull: ['$reorderLevel', '$minStock', 10] }] },
+      ],
+    },
+  });
+
+  const outOfStock = await Product.countDocuments({
+    status: 'Active',
+    currentStock: { $lte: 0 },
+  });
+
   const nearExpiry = await ProductBatch.countDocuments({ status: 'Near Expiry' });
   const expired = await ProductBatch.countDocuments({ status: 'Expired' });
-  const totalCustomers = await Customer.countDocuments();
-  const totalSuppliers = await Supplier.countDocuments();
+  const totalCustomers = await Customer.countDocuments({ status: 'Active' });
+  const totalSuppliers = await Supplier.countDocuments({ status: 'Active' });
 
   return ApiResponse.success(res, {
     data: {
       salesToday: round2(todaySalesAgg?.total || 0),
       monthlySales: round2(monthlySalesAgg?.total || 0),
       purchaseToday: round2(todayPurchaseAgg?.total || 0),
-      outstandingReceivable: round2(outstandingAgg?.total || 0),
+      totalPurchases: round2(totalPurchasesAgg?.total || 0),
+      outstandingReceivable: totalOutstandingReceivable,
       supplierPayable: totalSupplierPayable,
       stockValue: round2(stockValueAgg?.total || 0),
       lowStock,
+      outOfStock,
       nearExpiry,
       expired,
       totalCustomers,
@@ -99,7 +146,12 @@ const salesTrend = asyncHandler(async (req, res) => {
   ]);
 
   const purchaseMap = new Map(purchaseRows.map((r) => [r._id, r.purchase]));
-  const data = rows.map((r) => ({ date: dayjs(r._id).format('DD MMM'), sales: round2(r.sales), purchase: round2(purchaseMap.get(r._id) || 0) }));
+  const data = rows.map((r) => ({
+    date: dayjs(r._id).format('DD MMM'),
+    sales: round2(r.sales),
+    purchase: round2(purchaseMap.get(r._id) || 0),
+  }));
+
   return ApiResponse.success(res, { data });
 });
 

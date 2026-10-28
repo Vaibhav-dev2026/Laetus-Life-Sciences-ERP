@@ -52,7 +52,7 @@ export default function CustomerList() {
     { key: 'organization', label: 'Organization', render: (r) => r.organization || '-' },
     { key: 'mobile', label: 'Mobile' },
     { key: 'gstin', label: 'GSTIN', className: 'mono', render: (r) => r.gstin || '-' },
-    { key: 'openingOutstanding', label: 'Outstanding', align: 'right', sortable: true, render: (r) => formatCurrency(r.openingOutstanding) },
+    { key: 'currentBalance', label: 'Outstanding', align: 'right', sortable: true, render: (r) => formatCurrency(r.currentBalance !== undefined && r.currentBalance !== null ? r.currentBalance : (r.openingOutstanding || 0)) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     {
       key: 'actions', label: '', render: (r) => (

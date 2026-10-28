@@ -62,7 +62,11 @@ async function increaseStock({ productId, batchId, batchNo, mfgDate, expDate, qt
     productId, batchId: batch.id, type: refType, qty, refId, refType, balanceAfter: batch.currentQty, createdBy,
   }], opts);
 
-  await syncProductStock(productId, session);
+  const totalStock = await syncProductStock(productId, session);
+  try {
+    const { checkProductStockAlerts } = require('./notification.service');
+    await checkProductStockAlerts(productId, totalStock, session);
+  } catch (_) {}
   return batch;
 }
 
@@ -85,7 +89,11 @@ async function decreaseStock({ productId, batchId, qty, refType, refId, createdB
     productId, batchId: batch.id, type: refType, qty: -qty, refId, refType, balanceAfter: batch.currentQty, createdBy,
   }], opts);
 
-  await syncProductStock(productId, session);
+  const totalStock = await syncProductStock(productId, session);
+  try {
+    const { checkProductStockAlerts } = require('./notification.service');
+    await checkProductStockAlerts(productId, totalStock, session);
+  } catch (_) {}
   return batch;
 }
 
@@ -94,6 +102,7 @@ async function syncProductStock(productId, session) {
   const batches = await ProductBatch.find({ productId }, null, opts);
   const total = batches.reduce((a, b) => a + b.currentQty, 0);
   await Product.updateOne({ id: productId }, { $set: { currentStock: total } }, opts);
+  return total;
 }
 
 function assertExpiryPolicy(batch, policy) {

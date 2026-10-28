@@ -33,7 +33,19 @@ export default function Dashboard() {
       <PageHeader
         title="Executive Dashboard"
         description="Live snapshot of sales, inventory and receivables for Laetus Life Sciences."
-        actions={<DateRangeFilter from={range.from} to={range.to} onChange={setRange} />}
+        actions={(
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => { summary.reload(); trend.reload(); ageing.reload(); }}
+              title="Refresh live dashboard data"
+            >
+              🔄 Refresh
+            </button>
+            <DateRangeFilter from={range.from} to={range.to} onChange={setRange} />
+          </div>
+        )}
       />
 
       {summary.loading ? (
@@ -43,12 +55,13 @@ export default function Dashboard() {
       ) : (
         <div className="stat-grid">
           <StatCard label="Sales Today" value={formatCurrency(s.salesToday)} icon="🧮" />
-          <StatCard label="Monthly Sales" value={formatCurrency(s.monthlySales)} icon="📈" trend="+ this financial year" trendDirection="up" />
+          <StatCard label="Monthly Sales" value={formatCurrency(s.monthlySales)} icon="📈" trend="Current month" trendDirection="up" />
           <StatCard label="Purchase Today" value={formatCurrency(s.purchaseToday)} icon="🧾" />
           <StatCard label="Outstanding Receivable" value={formatCurrency(s.outstandingReceivable)} icon="📋" trendDirection="down" trend="Across all customers" />
           <StatCard label="Supplier Payable" value={formatCurrency(s.supplierPayable)} icon="🚚" />
           <StatCard label="Current Stock Value" value={formatCurrency(s.stockValue)} icon="📦" />
           <StatCard label="Low Stock Products" value={s.lowStock} icon="⚠️" />
+          {s.outOfStock > 0 && <StatCard label="Out of Stock Products" value={s.outOfStock} icon="🚨" />}
           <StatCard label="Near Expiry Batches" value={s.nearExpiry} icon="⏳" />
           <StatCard label="Expired Batches" value={s.expired} icon="⛔" />
           <StatCard label="Total Customers" value={s.totalCustomers} icon="👥" />
